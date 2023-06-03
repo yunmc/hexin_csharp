@@ -7,6 +7,7 @@ using Microsoft.Office.Interop.PowerPoint;
 
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 using Shape = Microsoft.Office.Interop.PowerPoint.Shape;
+using System.Drawing;
 
 
 // @description 配置类型结构体
@@ -57,6 +58,7 @@ namespace hexin_csharp
             Global.slideWidth = Global.app.ActivePresentation.PageSetup.SlideWidth;
             Global.slideHeight = Global.app.ActivePresentation.PageSetup.SlideHeight;
 
+            // 初始化
             Init();
 
             // ********************************************************************
@@ -72,20 +74,92 @@ namespace hexin_csharp
             {
                 Global.app.ActiveWindow.View.GotoSlide(slide.SlideIndex);
 
-                // 把页面处理成足够好看的单页
-                PageHandler.LayoutSlide(slide);
+                // @wips：
+                // PageHandler.HandleAnsweringSpaceWidth(slide);
+                // PageHandler.LayoutSlide(slide);
 
-                // 兼容处理（换行
+                // ********************************************************************
                 // 把页面处理成足够好看的单页
+                // ********************************************************************
+
+                // - ？支持动态标题设置背景颜色
+
+                // 标题页的处理
+                // - 解决标题内容重叠的问题
+
+                // 内容页的处理
+                // - 文本元素的增加（加续表
+                // - 集中处理材料下划线和下横线的问题
+                // - 刷文本（g2g，刷省略号，刷公式字体颜色
+                // - 刷表格（边框，表头
+                // - 刷图片背景颜色
+                // - 文本元素的拆分（制表符数量不一致的情况
+                // - 刷制表符（选项对齐题干，对折行的选项加换行
+                // - 单行的处理（占位，作答空间，元素位置匹配，撑行高，溢出文本框的公式/行内图片、复杂公式拆 P，兼容性换行，解决西文换行配置导致不接排的问题，缓解文末小尾巴的问题，处理标点符号句首的问题，删除多余的作答空间下横线，处理括号单独成行的情况
+                // - 支持图文环绕的场景
+                // - 刷制表符（选项对齐题干，对折行的选项加换行
+                // - 刷界标
+                // - 刷图片填空
+                // - 刷行高（复杂公式 1.1 倍行高，兼容性刷磅值行高，撑高
+                // - 刷文本框的尺寸（兼容性加宽
+                // - 其他兼容性处理（公式对齐方式，单行答案换行方式
+                // - 排版（紧凑图文布局
+                // - 元素位置匹配（ocr_match
+
+                PageHandler.HandleLine(slide);
+
+                // ********************************************************************
                 // 把溢出版心的单页分页
-                // 页面的压缩、合并和移动，元素的再生成
+                // ********************************************************************
+                // - 尝试压缩页面
+                // - 分页
+                // - 分页后处理（支持题图跨页复制，处理答案在解析后的情况
+
+                // ********************************************************************
+                // 页面的压缩、合并和移动
+                // ********************************************************************
+
+                // ********************************************************************
                 // 场景处理
-                // 兼容处理（刷行高
-                // 占位元素的位置匹配
+                // ********************************************************************
+                // - 两端对齐
+                // - 长文本答案的处理（接排
+                // - 大括号的处理
+                // - 选择题答案变对勾
+                // - 支持对勾答案
+                // - 支持行内框
+                // - 支持表格斜线
+                // - 支持着重点
+                // - 支持页码
+                // - 支持超链接
+                // - 支持题号目录
+
+                // ********************************************************************
                 // 加动画
-                // 其他不会动版的处理
-                // 信息混淆
+                // ********************************************************************
+
+                // ********************************************************************
+                // 收尾工作
+                // ********************************************************************
+                // - 删除空文本、空动画、空页面
+                // - 删除标记
+
+                // ********************************************************************
                 // 机器质检
+                // ********************************************************************
+
+                // ********************************************************************
+                // 信息混淆
+                // ********************************************************************
+                // - 母版
+                // - 页面
+                // - 元素
+
+                // - 保存文件
+                // - 另存为 PDF
+                // - 上传预览图
+                // - 返回
+
 
                 // foreach (PowerPoint.Shape shape in slide.Shapes)
                 // {
@@ -160,9 +234,9 @@ namespace hexin_csharp
                 {
                     if (regex.IsMatch(c.Name))
                     {
-                        Global.PptSubject = regex.Match(c.Name).Groups[1].Value;
-                        Global.PptProjectId = regex.Match(c.Name).Groups[2].Value;
-                        Global.PptTaskId = regex.Match(c.Name).Groups[3].Value;
+                        Global.pptSubject = regex.Match(c.Name).Groups[1].Value;
+                        Global.pptProjectId = regex.Match(c.Name).Groups[2].Value;
+                        Global.pptTaskId = regex.Match(c.Name).Groups[3].Value;
                         return;
                     }
                 }
@@ -177,11 +251,737 @@ namespace hexin_csharp
             Global.viewRight = (float)(Global.slideWidth * (view[0] - padding[3]) / view[0]);
             Global.viewTop = (float)(Global.slideHeight * padding[0] / view[1]);
             Global.viewBottom = (float)(Global.slideHeight * (view[1] - padding[1]) / view[1]);
+            Global.GapBetweenTextLine = Utils.ComputeGapBetweenLines();
         }
     }
 
     internal class PageHandler
     {
+        // @description：单行的处理
+        static public void HandleLine(Slide slide)
+        {
+            List<Shape[]> processedShapes = new List<Shape[]>();
+            List<Shape> processedMatchedShapes = new List<Shape>();
+            foreach (Shape shape in slide.Shapes)
+            {
+                // 做一些全局的数据结构缓存！！！
+                if (shape.Type == MsoShapeType.msoPicture)
+                {
+                    if (Regex.IsMatch(shape.Name, @"tableimageindex=(\d+)"))
+                    {
+                        string shapeNodeId = Utils.GetShapeInfo(shape)[0];
+                        string index = Regex.Match(shape.Name, @"tableimageindex=(\d+)").Groups[1].Value;
+                        string key = shapeNodeId + "#" + index;
+                        if (!Global.GlobalTableImageMap.ContainsKey(key))
+                        {
+                            Global.GlobalTableImageMap.Add(key, shape);
+                        }
+                    }
+                    else if (Regex.IsMatch(shape.Name, @"inlineimagemarkindex=(\d+)"))
+                    {
+                        string index = Regex.Match(shape.Name, @"inlineimagemarkindex=(\d+)").Groups[1].Value;
+                        if (!Global.GlobalInlineImageMap.ContainsKey(index))
+                        {
+                            Global.GlobalInlineImageMap.Add(index, shape);
+                        }
+                    }
+                }
+                if (shape.Type == MsoShapeType.msoPicture && shape.Name.Contains("imagetipindex"))
+                {
+                    string index = Regex.Match(shape.Name, @"imagetipindex=(\d+)").Groups[1].Value;
+                    if (!Global.GlobalImageTipMap.ContainsKey(index))
+                    {
+                        Global.GlobalImageTipMap.Add(index, new Shape[] { shape, null });
+                    }
+                    else
+                    {
+                        Global.GlobalImageTipMap[index] = new Shape[] { shape, Global.GlobalImageTipMap[index][1] };
+                    }
+                }
+                if (shape.HasTextFrame == MsoTriState.msoFalse && shape.Name.Contains("imagetipindex"))
+                {
+                    string index = Regex.Match(shape.Name, @"imagetipindex=(\d+)").Groups[1].Value;
+                    if (!Global.GlobalImageTipMap.ContainsKey(index))
+                    {
+                        Global.GlobalImageTipMap.Add(index, new Shape[] { null, shape });
+                    }
+                    else
+                    {
+                        Global.GlobalImageTipMap[index] = new Shape[] { Global.GlobalImageTipMap[index][0], shape };
+                    }
+                }
+                if (shape.HasTextFrame == MsoTriState.msoFalse && shape.Name.Contains("imagetipindex"))
+                {
+                    string index = Regex.Match(shape.Name, @"imagetipindex=(\d+)").Groups[1].Value;
+                    if (!Global.GlobalImageTipMap.ContainsKey(index))
+                    {
+                        Global.GlobalImageTipMap.Add(index, new Shape[] { null, shape });
+                    }
+                    else
+                    {
+                        Global.GlobalImageTipMap[index] = new Shape[] { Global.GlobalImageTipMap[index][0], shape };
+                    }
+                }
+                if (shape.HasTextFrame == MsoTriState.msoTrue && (shape.Name.Contains("AN") || shape.Name.Contains("_WB")))
+                {
+                    if (Regex.IsMatch(shape.Name, "vbapositionanswer=(\\d+)"))
+                    {
+                        string index = Regex.Match(shape.Name, "vbapositionanswer=(\\d+)").Groups[1].Value;
+                        if (!Global.GlobalAnswerMarkIndexMap.ContainsKey(index))
+                        {
+                            Global.GlobalAnswerMarkIndexMap.Add(index, shape);
+                        }
+                        // @todo：这里需要考虑文本答案作答空间在图片上的情况。
+                    }
+                }
+                if (shape.HasTextFrame == MsoTriState.msoTrue && !shape.Name.Contains("AN"))
+                {
+                    if (Regex.IsMatch(shape.TextFrame.TextRange.Text, "@(\\d+)@"))
+                    {
+                        foreach (Match match in Regex.Matches(shape.TextFrame.TextRange.Text, "@(\\d+)@"))
+                        {
+                            string index = match.Groups[1].Value;
+                            if (!Global.GlobalBlankMarkIndexMap.ContainsKey(index))
+                            {
+                                Global.GlobalBlankMarkIndexMap.Add(index, new Shape[] { shape, shape });
+                            }
+                        }
+                    }
+                }
+                if (shape.HasTable == MsoTriState.msoTrue)
+                {
+                    foreach (Row row in shape.Table.Rows)
+                    {
+                        foreach (Cell cell in row.Cells)
+                        {
+                            if (Regex.IsMatch(cell.Shape.TextFrame.TextRange.Text, "@(\\d+)@"))
+                            {
+                                foreach (Match match in Regex.Matches(cell.Shape.TextFrame.TextRange.Text, "@(\\d+)@"))
+                                {
+                                    string index = match.Groups[1].Value;
+                                    if (!Global.GlobalBlankMarkIndexMap.ContainsKey(index))
+                                    {
+                                        Global.GlobalBlankMarkIndexMap.Add(index, new Shape[] { cell.Shape, shape });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!Utils.CheckMatchPositionShape(shape))
+                {
+                    if (shape.HasTextFrame == MsoTriState.msoTrue)
+                    {
+                        processedShapes.Add(new Shape[] { shape, shape });
+                    }
+                    else if (shape.HasTable == MsoTriState.msoTrue)
+                    {
+                        foreach (Row row in shape.Table.Rows)
+                        {
+                            foreach (Cell cell in row.Cells)
+                            {
+                                processedShapes.Add(new Shape[] { cell.Shape, shape });
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    processedMatchedShapes.Add(shape);
+                }
+            }
+            foreach (Shape[] item in processedShapes)
+            {
+                Shape shape = item[0];
+                Shape containerShape = item[1];
+                for (int l = 1; l <= shape.TextFrame.TextRange.Lines().Count; l++)
+                {
+                    TextRange line = shape.TextFrame.TextRange.Lines(l);
+                    TextRange2 line2 = shape.TextFrame2.TextRange.Lines[l];
+                    int formulaBeginLineIndex = -1; // 标记当前行是否存在于跨行的公式里
+                    // - 占位（行内图片、表格图片
+                    // - 作答空间
+                    if (Regex.IsMatch(line.Text, @"(&\d+&)|(%\d+%)|(@\d+@)"))
+                    {
+                        int offset = 0; // 插东西导致的字符索引位移
+                        foreach (Match match in Regex.Matches(line.Text, @"(&\d+&)|(%\d+%)|(@\d+@)"))
+                        {
+                            if (match.Value.Contains("&"))
+                            { // 行内图片，@todo：需要考虑行内图片是图片填空的情况
+                                offset += HandleImagePosition(match, line, line2, shape, offset);
+                            }
+                            else if (match.Value.Contains("%"))
+                            { // 表格图片
+                                offset += HandleImagePosition(match, line, line2, shape, offset);
+                            }
+                            else if (match.Value.Contains("@"))
+                            { // 作答空间
+                                offset += HandleAnswerPosition(match, line, line2, shape, containerShape, offset);
+                            }
+                        }
+                    }
+                    // - 缓解文末小尾巴的问题
+                    // - 兼容性换行（溢出文本框的空格、答案里的行内图片，复杂公式拆 P
+                    HandleLineEnter();
+                    // - 解决西文换行配置导致不接排的问题
+                    // - 解决标点符号句首的问题
+                    // - 删除多余的作答空间下横线
+                    // - 处理括号单独成行的情况
+                }
+            }
+            foreach (Shape shape in processedMatchedShapes)
+            {
+                // - 元素位置匹配
+                if (Utils.CheckMatchPositionAnswer(shape))
+                {
+                    PositionMatchHandler.MatchAnswerPosition(shape);
+                }
+            }
+        }
+
+        static public bool HandleLineEnter()
+        {
+            bool hasEnter = false; // 当前行是否已经插过换行符
+            return hasEnter;
+        }
+
+        static public int HandleAnswerPosition(Match match, TextRange line, TextRange2 line2, Shape shape, Shape containerShape, int offset)
+        {
+            string index = Regex.Match(match.Value, @"\d+").Value;
+            Shape answerShape = null;
+            int matchFirstIndex = match.Index + offset;
+            if (Global.GlobalAnswerMarkIndexMap.ContainsKey(index))
+            {
+                answerShape = Global.GlobalAnswerMarkIndexMap[index];
+            }
+            if (answerShape == null)
+            {
+                return 0;
+            }
+            // @tips：
+            // 计算前先匹配一下答案位置，因为公式不一定会在哪里产生换行，故而需要匹配位置之后才能准确计算出宽度，
+            // 并且，匹配答案位置会给折行的答案前面加空格，需要记录一下添加的空格数量，用来计算答案宽度。
+            PositionMatchHandler.MatchAnswerPosition(answerShape, shape, containerShape);
+            // 判断填空还是选择，下横线还是空格
+            string spaceChar = "_";
+            TextRange spaceRange = line.Characters(matchFirstIndex + match.Value.Length + 1);
+            if (spaceRange.Text == " ")
+            {
+                spaceChar = " ";
+            }
+            else if (spaceRange.Text == "_")
+            {
+                spaceChar = "_";
+            }
+            // 计算答案的宽度
+            double answerWidth = 0;
+            if (answerShape.TextFrame.TextRange.Lines().Count == 1)
+            { // 单行答案
+                answerWidth = Utils.ComputeAnswerFirstLineWidth(answerShape, 2);
+            }
+            else
+            { // 多行答案
+                for (int l = 1; l <= answerShape.TextFrame.TextRange.Lines().Count; l++)
+                {
+                    if (l == 1)
+                    {
+                        answerWidth += Utils.ComputeAnswerFirstLineWidth(answerShape, 1);
+                    }
+                    else if (l == answerShape.TextFrame.TextRange.Lines().Count)
+                    {
+                        answerWidth += answerShape.TextFrame.TextRange.Lines(l).BoundLeft +
+                            answerShape.TextFrame.TextRange.Lines(l).BoundWidth -
+                            shape.Left;
+                        if (containerShape.HasTable == MsoTriState.msoTrue)
+                        {
+                            answerWidth += containerShape.Left;
+                        }
+                    }
+                    else
+                    {
+                        answerWidth += shape.Width;
+                    }
+                }
+            }
+            // 找到作答空间 Range 部分
+            TextRange matchRange = shape.TextFrame.TextRange.Find(match.Value);
+            int rangeStart = matchRange.Start + match.Value.Length;
+            int rangeEnd = rangeStart;
+            while (rangeEnd <= shape.TextFrame.TextRange.Length)
+            {
+                if (shape.TextFrame.TextRange.Characters(rangeEnd).Text != spaceChar)
+                {
+                    rangeEnd--;
+                    if (shape.TextFrame.TextRange.Characters(rangeEnd + 1).Text == "@")
+                    { // 需要注意多个作答空间连续的情况 _@1@____@2@___
+                        rangeEnd++;
+                    }
+                    break;
+                }
+                rangeEnd++;
+            }
+            // 替换
+            spaceRange.Font.Name = "SimSun";
+            float spaceWidth = spaceRange.BoundWidth;
+            int spaceCount = (int)Math.Round(answerWidth / spaceWidth + 0.5);
+            if (spaceChar == " " && spaceRange.Font.Underline == MsoTriState.msoFalse)
+            { // 选择题、空格的作答空间，多加 2 个空格，看起来好看一些
+                spaceCount += 2;
+            }
+            if (containerShape.Name.Contains("QC") && Regex.IsMatch(answerShape.TextFrame.TextRange.Text, @"^\s*[ABCD]\s*$"))
+            { // 全局的选择题答案的宽度，保持一致
+                if (Global.qcSpaceCount == -1)
+                {
+                    Global.qcSpaceCount = spaceCount;
+                }
+                else
+                {
+                    spaceCount = Global.qcSpaceCount;
+                }
+            }
+            int i = 1;
+            string spaces = spaceChar;
+            while (i < spaceCount)
+            {
+                spaces += spaceChar;
+                i++;
+            }
+            // @todo：需要单独处理带题号的完形填空，e.g. "_1@1@____"。
+            MsoTriState hasUnderLine = spaceRange.Font.Underline;
+            shape.TextFrame.TextRange.Characters(rangeStart, rangeEnd + 1 - rangeStart).Text = spaces;
+            shape.TextFrame.TextRange.Characters(rangeStart, spaces.Length).Font.Underline = hasUnderLine;
+            shape.TextFrame.TextRange.Characters(rangeStart, spaces.Length).Font.Name = "SimSun";
+            shape.TextFrame2.TextRange.Characters[rangeStart, spaces.Length].Font.Spacing = 0;
+            offset = spaces.Length - (rangeEnd + 1 - rangeStart);
+            return offset;
+        }
+
+        static public int HandleImagePosition(Match match, TextRange line, TextRange2 line2, Shape shape, int offset)
+        {
+            string index = Regex.Match(match.Value, @"\d+").Value;
+            Shape imageShape = null;
+            Shape imageTipShape = null;
+            float shapeFontSize = (float)Utils.GetShapeTextInfo(shape)[0];
+            int matchFirstIndex = match.Index + offset;
+            if (match.Value.Contains("&") && Global.GlobalInlineImageMap.ContainsKey(index))
+            {
+                imageShape = Global.GlobalInlineImageMap[index];
+            }
+            else if (match.Value.Contains("%") && Global.GlobalTableImageMap.ContainsKey(index))
+            {
+                imageShape = Global.GlobalTableImageMap[index];
+            }
+            if (imageShape == null)
+            {
+                return 0;
+            }
+            if (Regex.IsMatch(imageShape.Name, @"imagetipindex=(\d+)"))
+            {
+                string imageTipIndex = Regex.Match(imageShape.Name, @"imagetipindex=(\d+)").Groups[1].Value;
+                if (Global.GlobalImageTipMap.ContainsKey(imageTipIndex))
+                {
+                    imageTipShape = Global.GlobalImageTipMap[imageTipIndex][0];
+                }
+            }
+            float targetHeight = imageShape.Height;
+            float targetWidth = imageShape.Width;
+            if (imageTipShape != null)
+            {
+                // @todo：若图说宽度大于图片，则先设置一下宽度。
+                targetHeight += imageTipShape.TextFrame.TextRange.BoundHeight + 10;
+            }
+            // 插空格
+            line.Characters(matchFirstIndex + match.Value.Length).InsertAfter(" ");
+            TextRange spaceRange = line.Characters(matchFirstIndex + match.Value.Length + 1);
+            TextRange2 spaceRange2 = line2.Characters[matchFirstIndex + match.Value.Length + 1];
+            spaceRange2.Font.Spacing = -shapeFontSize;
+            // 设置字号（高度
+            if (spaceRange.BoundHeight < targetHeight)
+            {
+                float leftHeight = 0;
+                float leftFontSize = 1;
+                float rightHeight = 999;
+                float rightFontSize = 1;
+                float targetFontSize = 7;
+                double j = shapeFontSize;
+                while (j < 999)
+                {
+                    spaceRange.Font.Size = (float)j;
+                    if (spaceRange.BoundHeight == targetHeight)
+                    {
+                        targetFontSize = (float)j;
+                        break;
+                    }
+                    if (spaceRange.BoundHeight < targetHeight && spaceRange.BoundHeight > leftHeight)
+                    {
+                        leftHeight = spaceRange.BoundHeight;
+                        leftFontSize = (float)j;
+                    }
+                    if (spaceRange.BoundHeight > targetHeight && spaceRange.BoundHeight < rightHeight)
+                    {
+                        rightHeight = spaceRange.BoundHeight;
+                        rightFontSize = (float)j;
+                        break;
+                    }
+                    j += 0.5;
+                }
+                if (leftFontSize > 0 && rightHeight > 0 && rightHeight < 999)
+                {
+                    if (Math.Abs(targetHeight - leftHeight) > Math.Abs(targetHeight - rightHeight))
+                    {
+                        targetFontSize = rightFontSize;
+                    }
+                    else
+                    {
+                        targetFontSize = leftFontSize;
+                    }
+                }
+                else if (targetFontSize < shapeFontSize)
+                {
+                    targetFontSize = shapeFontSize;
+                }
+                spaceRange.Font.Size = targetFontSize;
+                spaceRange2.Font.Spacing = -targetFontSize;
+            }
+            // 设置字间距（宽度
+            if (spaceRange.BoundWidth < targetWidth)
+            {
+                float leftWidth = 0;
+                float leftSpacing = spaceRange2.Font.Spacing;
+                float rightWidth = 999;
+                float rightSpacing = 999;
+                float targetSpacing = spaceRange2.Font.Spacing;
+                float j = spaceRange2.Font.Spacing;
+                while (j < 999)
+                {
+                    spaceRange2.Font.Spacing = j;
+                    if (spaceRange.BoundWidth == targetWidth)
+                    {
+                        targetSpacing = j;
+                        break;
+                    }
+                    if (spaceRange.BoundWidth < targetWidth && spaceRange.BoundWidth > leftWidth)
+                    {
+                        leftWidth = spaceRange.BoundWidth;
+                        leftSpacing = j;
+                    }
+                    if (spaceRange.BoundWidth > targetWidth && spaceRange.BoundWidth < rightWidth)
+                    {
+                        rightWidth = spaceRange.BoundWidth;
+                        rightSpacing = j;
+                        break;
+                    }
+                    j += 1;
+                }
+                if (leftWidth > 0 && rightWidth > 0 && rightWidth < 999)
+                {
+                    if (Math.Abs(targetWidth - leftWidth) > Math.Abs(targetWidth - rightWidth))
+                    {
+                        targetSpacing = rightSpacing;
+                    }
+                    else
+                    {
+                        targetSpacing = leftSpacing;
+                    }
+                }
+                spaceRange2.Font.Spacing = targetSpacing;
+            }
+            return 1;
+        }
+
+        static public void HandleAnsweringSpaceWidth(Slide slide)
+        {
+            int spaceCountChoice = -1;
+            Dictionary<string, object[]>[] bam = Utils.GetBlankAndAnswerMap(new List<Slide> { slide });
+            Dictionary<string, object[]> blankMap = bam[0];
+            Dictionary<string, object[]> answerMap = bam[1];
+            foreach (string key in answerMap.Keys)
+            {
+                bool flagBlank = false;
+                bool flagBracket = false;
+                if (blankMap.ContainsKey(key))
+                {
+                    Shape targetanswerShape = (Shape)answerMap[key][0];
+                    Shape targetblankShape = (Shape)blankMap[key][6];
+                    TextRange matchRange = (TextRange)blankMap[key][7];
+                    Shape containerShape = (Shape)blankMap[key][8];
+                    // @tips：
+                    // 计算前先匹配一下答案位置，
+                    // 因为公式不一定会在哪里产生换行，所以需要匹配位置之后才能准确计算出宽度，
+                    // 匹配答案位置会给折行的答案前面加空格，需要记录一下添加的空格数量，用来计算答案宽度。
+                    // @todo：是否需要移动位置可以判断得再精细一些。
+                    // @todo：性能有优化的空间，把 targetblankShape 也传参进去。
+                    PositionMatchHandler.MatchAnswerPosition(targetanswerShape, targetblankShape, containerShape);
+                    // 拉开答案文本框，用于计算尺寸
+                    float oldAnswerWidth = targetanswerShape.Width;
+                    int oldAnswerLineCount = targetanswerShape.TextFrame.TextRange.Lines().Count;
+                    float foldAnswerWidth = 0;
+                    // @tips：
+                    // 按行计算长文本答案的宽度，最后和拉伸开的宽度取最大值、用来生成填空横线，
+                    // 注意拉伸前需要先进行行首缩进的处理，尽量还原单词换行的现场。
+                    TextRange textRange = targetanswerShape.TextFrame.TextRange;
+                    // - 需要注意答案中可能存在换行符
+                    if (textRange.Paragraphs().Count == 1)
+                    {
+                        for (int l = 1; l <= textRange.Lines().Count; l++)
+                        {
+                            TextRange line = textRange.Lines(l);
+                            float currentLineWidth = 0;
+                            if (line.BoundHeight < 5) // 对于高度忽略不计的行，不统计其宽度，很有可能是单独成行的标记
+                            {
+                                currentLineWidth = 0;
+                            }
+                            // - 对于公式折行的情况第一行和最后一行直接取内容的宽度会不准确, 所以应根据文字的 left 值计算出内容宽度
+                            else if (l == 1) // 第一行
+                            {
+                                currentLineWidth = (float)Utils.ComputeAnswerFirstLineWidth(targetanswerShape, 1);
+                            }
+                            else if (l == textRange.Lines().Count) // 最后一行
+                            {
+                                currentLineWidth = line.Characters(line.Length).BoundLeft + line.Characters(line.Length).BoundWidth - targetanswerShape.Left;
+                            }
+                            else // 多行
+                            {
+                                currentLineWidth = targetanswerShape.Width;
+                            }
+                            foldAnswerWidth += currentLineWidth;
+                        }
+                    }
+                    else if (textRange.Paragraphs().Count > 1)
+                    {
+                        for (int p = 1; p <= textRange.Paragraphs().Count; p++)
+                        {
+                            if (p < textRange.Paragraphs().Count)
+                            {
+                                foldAnswerWidth += textRange.Paragraphs(p).Lines().Count * containerShape.Width;
+                            }
+                            else
+                            {
+                                foldAnswerWidth += (textRange.Paragraphs(p).Lines().Count - 1) * containerShape.Width;
+                                foldAnswerWidth += textRange.Paragraphs(p).Lines(textRange.Paragraphs(p).Lines().Count).BoundWidth;
+                            }
+                        }
+                    }
+                    targetanswerShape.TextFrame.MarginBottom = 0;
+                    targetanswerShape.TextFrame.MarginRight = 0;
+                    targetanswerShape.TextFrame.MarginLeft = 0;
+                    targetanswerShape.TextFrame.MarginTop = 0;
+                    targetanswerShape.TextFrame.WordWrap = MsoTriState.msoFalse;
+                    targetanswerShape.TextFrame.Ruler.Levels[1].FirstMargin = 0;
+                    targetanswerShape.Width = targetanswerShape.TextFrame.TextRange.BoundWidth;
+                    // 找到标记附近的下横线、空格的起点和终点
+                    int i = matchRange.Start - 1;
+                    // @tips：
+                    // - 需要考虑完形填空 _1@1@____ 的情况，不能直接使用 Start - 1，而是要遍历找到前面的下横线
+                    // - 需要考虑完形填空 @1@____ 的情况
+                    while (i > 0) // 找到标记左侧首个 _ 或者空格
+                    {
+                        if (targetblankShape.TextFrame.TextRange.Characters(i).Text == "_")
+                        {
+                            flagBlank = true; // 填空题，下横线
+                            break;
+                        }
+                        else if (targetblankShape.TextFrame.TextRange.Characters(i).Text == " ")
+                        {
+                            flagBracket = true; // 选择题，空格
+                            break;
+                        }
+                        i--;
+                    }
+                    int matchStart = matchRange.Start;
+                    int matchEnd = matchRange.Start + matchRange.Length - 1;
+                    // @tips：
+                    // - 需要考虑完形填空 _1@1@____ 的情况，要跳过最左侧的数字 1，这里直接使用上面循环的 i 即可
+                    // - 需要考虑完形填空 @1@____ 的情况
+                    while (i > 0)
+                    { // 找到答案填空位置的开头，即最左侧的 _ 或者空格
+                        if (flagBlank && targetblankShape.TextFrame.TextRange.Characters(i).Text != "_")
+                        {
+                            break;
+                        }
+                        if (flagBracket && targetblankShape.TextFrame.TextRange.Characters(i).Text != " ")
+                        {
+                            break;
+                        }
+                        i--;
+                    }
+                    int blankStart = i + 1;
+                    // 需要考虑横线上有多个填空答案的情况
+                    if (i > 0 && targetblankShape.TextFrame.TextRange.Characters(i).Text == "@")
+                    {
+                        blankStart = matchRange.Start - 1;
+                    }
+                    i = matchEnd + 1;
+                    while (i <= targetblankShape.TextFrame.TextRange.Length)
+                    {
+                        if (flagBlank && targetblankShape.TextFrame.TextRange.Characters(i).Text != "_")
+                        {
+                            break;
+                        }
+                        if (flagBracket && targetblankShape.TextFrame.TextRange.Characters(i).Text != " ")
+                        {
+                            break;
+                        }
+                        i++;
+                    }
+                    int blankEnd = i - 1;
+                    // 判断填空位置是否是带题号的完型填空，需要特殊处理，形式如 _1@1@____
+                    // @todo：待迁移到独立的函数中。
+                    bool flagCase01 = false;
+                    TextRange blankRange = targetblankShape.TextFrame.TextRange.Characters(blankStart, blankEnd + 1 - blankStart);
+                    string qnum = "";
+                    if (Regex.IsMatch(blankRange.Text, "_+(\\d+)\\@\\d+_+"))
+                    {
+                        flagCase01 = true;
+                        qnum = Regex.Match(blankRange.Text, "_+(\\d+)\\@\\d+_+").Groups[1].Value;
+                        // 若命中带题号的完型填空的场景，则在题号和标记间加一个空格，更好看一些
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart, blankEnd + 1 - blankStart).Find(qnum).InsertAfter(" ");
+                        matchStart++;
+                        matchEnd++;
+                        blankEnd++;
+                    }
+                    // 计算答案的宽度，更新下横线、空格的数量
+                    float expandAnswerWidth = (float)Utils.ComputeAnswerFirstLineWidth(targetanswerShape, 1);
+                    // @tips：
+                    // - 需要注意代码执行到这里时答案已经被拉开、直接取值即可
+                    // - 需要注意原则上尽量取比较长的宽度，避免横线不够长的情况
+                    // - 需要注意若答案宽度不会产生折行，则直接使用元素宽度进行横线宽度的计算基准即可
+                    // - 需要注意，答案可能包含换行符
+                    float answerWidth = expandAnswerWidth;
+                    if (answerWidth < foldAnswerWidth)
+                    {
+                        answerWidth = foldAnswerWidth;
+                    }
+                    float matchRangePositionLeft = expandAnswerWidth + (matchRange.BoundLeft - targetblankShape.Left);
+                    if (containerShape.HasTable == MsoTriState.msoTrue)
+                    {
+                        matchRangePositionLeft += containerShape.Left;
+                    }
+                    if (matchRangePositionLeft <= targetblankShape.Width && targetanswerShape.TextFrame.TextRange.Paragraphs().Count == 1)
+                    {
+                        answerWidth = expandAnswerWidth;
+                    }
+                    // @tips：
+                    // 若答案只有 1 行、或者答案长度小于作答空间所属的元素宽度，并且高度大于平均行高，
+                    // 则使用 ExpandAnswerWidth 进行下面的处理，
+                    // 这里认为会在其他函数进行作答空间的换行处理。
+                    if ((oldAnswerLineCount == 1 || targetanswerShape.TextFrame.TextRange.BoundWidth < targetblankShape.Width) &&
+                       (targetanswerShape.TextFrame.TextRange.BoundHeight > Utils.ComputeRangeAvgLineHeight(targetblankShape, blankStart, blankEnd) - Global.GapBetweenTextLine[1]) &&
+                       (targetanswerShape.TextFrame.TextRange.Paragraphs().Count == 1))
+                    {
+                        answerWidth = expandAnswerWidth;
+                    }
+                    if (flagCase01)
+                    {
+                        // @tips：需要注意，这里要把下划线的形式调整为“._67_@1@_____.”的形式，避免 PPT 自动把空格删掉。
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart).Text = " ";
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart).Font.Name = "SimSun";
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart).Font.Underline = MsoTriState.msoTrue;
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart).InsertBefore(".");
+                        targetblankShape.TextFrame.TextRange.Characters(blankStart).Font.Color.RGB = ColorTranslator.ToOle(Color.FromArgb(255, 255, 255)); ;
+                        targetblankShape.TextFrame2.TextRange.Characters[blankStart].Font.Spacing = 0 - 999;
+                        matchStart++;
+                        matchEnd++;
+                        blankStart++;
+                        blankEnd++;
+                    }
+                    float spaceWidth = targetblankShape.TextFrame.TextRange.Characters(blankStart).BoundWidth; // 单条下横线的宽度
+                    if (spaceWidth > 1)
+                    {
+                        int spaceCount = (int)Math.Round(answerWidth / spaceWidth + 0.5); // 期望的下横线条数，向上取整
+                        if (Utils.SafeFindShapeName(targetblankShape).Contains("QC_") &&
+                            targetanswerShape.HasTextFrame == MsoTriState.msoTrue)
+                        {
+                            // @tips：
+                            // 需要注意这里选择题单独处理，括号内空格个数只算一遍，保持一致，
+                            // 避免完形填空的括号宽度不一致。
+                            if (Regex.IsMatch(targetanswerShape.TextFrame.TextRange.Text, @"^\s*[ABCD]\s*$"))
+                            {
+                                if (spaceCountChoice == -1)
+                                {
+                                    spaceCountChoice = (int)Math.Round(answerWidth / spaceWidth + 0.5);
+                                }
+                                spaceCount = spaceCountChoice;
+                            }
+                        }
+                        string spaceItem = "";
+                        if (flagBlank)
+                        {
+                            spaceItem = "_";
+                        }
+                        else if (flagBracket)
+                        {
+                            spaceItem = " ";
+                        }
+                        // - 下横线的作答空间，在答案两边各加一个空格即可
+                        // - 选择题、空格的作答空间，多加 2 个空格，看起来好看一些
+                        if (Utils.SafeFindShapeName(targetblankShape).Contains("QC_") && flagBracket)
+                        {
+                            spaceCount += +2;
+                        }
+                        // 判断填空位置是否是带题号的完型填空，需要特殊处理，形式如 _1@1@____
+                        // - 空格占位
+                        // - 空格字体对齐题号、并且使用下划线样式
+                        if (flagCase01)
+                        {
+                            spaceItem = " ";
+                        }
+
+                        string spaceRange = spaceItem;
+                        i = 1;
+                        while (i < spaceCount)
+                        {
+                            spaceRange = spaceRange + spaceItem;
+                            i++;
+                        }
+                        // 标记后的部分：这里先处理标记位置后的部分，否则索引是不准确的
+                        targetblankShape.TextFrame.TextRange.Characters(matchEnd + 1, blankEnd - matchEnd).Text = spaceRange;
+                        if (targetblankShape.TextFrame2.TextRange.Characters[matchEnd + 1, spaceRange.Length].Font.Spacing < 0)
+                        { // 需要修正一下字间距，避免被位置标记影响
+                            targetblankShape.TextFrame2.TextRange.Characters[matchEnd + 1, spaceRange.Length].Font.Spacing =
+                                (targetblankShape.TextFrame2.TextRange.Characters[matchEnd + 1, spaceRange.Length].Font.Spacing) +
+                                (-targetblankShape.TextFrame2.TextRange.Characters[matchEnd + 1, spaceRange.Length].Font.Spacing);
+                        }
+                        // @tips：标记前的部分： FlagCase01 为 True 则 CInt(FlagCase01) 等于 -1，否则等于 0。
+                        // @tips：若下横线在段首，则不进行该处理、避免误伤作文题的段首缩进。
+                        if (targetblankShape.TextFrame.TextRange.Characters(blankStart - 1).Text != "\r" || blankStart == 1)
+                        {
+                            targetblankShape.TextFrame.TextRange.Characters(blankStart, matchStart - blankStart - qnum.Length + Convert.ToInt32(flagCase01)).Text = spaceItem;
+                        }
+                        if (targetblankShape.TextFrame2.TextRange.Characters[blankStart, 1].Font.Spacing < 0)
+                        { // 需要修正一下字间距，避免被位置标记影响
+                            targetblankShape.TextFrame2.TextRange.Characters[blankStart, 1].Font.Spacing =
+                                (targetblankShape.TextFrame2.TextRange.Characters[blankStart, 1].Font.Spacing) +
+                                (-targetblankShape.TextFrame2.TextRange.Characters[blankStart, 1].Font.Spacing);
+                        }
+                        // 判断填空位置是否是带题号的完型填空，需要特殊处理，形式如 _1@1@____
+                        // - 空格占位
+                        // - 空格字体对齐题号、并且使用下划线样式
+                        if (flagCase01)
+                        {
+                            targetblankShape.TextFrame.TextRange.Characters(matchEnd + 1, spaceRange.Length).Font.Name = "SimSun";
+                            targetblankShape.TextFrame.TextRange.Characters(matchEnd + 1, spaceRange.Length).Font.Underline = MsoTriState.msoTrue;
+                            // @tips：需要注意，这里要把下划线的形式调整为“._67_@1@_____.”的形式，避免 PPT 自动把空格删掉。
+                            targetblankShape.TextFrame.TextRange.Characters(matchEnd + spaceRange.Length + 1).InsertAfter(".");
+                            targetblankShape.TextFrame.TextRange.Characters(matchEnd + spaceRange.Length + 1).Font.Color.RGB = ColorTranslator.ToOle(Color.FromArgb(255, 255, 255));
+                            targetblankShape.TextFrame.TextRange.Characters(matchEnd + spaceRange.Length + 1).Font.Underline = MsoTriState.msoFalse;
+                            targetblankShape.TextFrame2.TextRange.Characters[matchEnd + spaceRange.Length + 1].Font.Spacing = 0 - 999;
+                            targetblankShape.TextFrame.TextRange.Characters(blankStart, 1).Font.Name = "SimSun";
+                            targetblankShape.TextFrame.TextRange.Characters(blankStart, 1).Font.Underline = MsoTriState.msoTrue;
+                        }
+                    }
+                    // 还原答案的宽度
+                    targetanswerShape.Width = oldAnswerWidth;
+                    targetanswerShape.TextFrame.WordWrap = MsoTriState.msoTrue;
+                }
+            }
+        }
+
+        static public void HandleInlineImagePosition(Slide slide)
+        {
+
+        }
+
         static public void LayoutSlide(Slide slide)
         {
             // 判断当前页是否需要处理
@@ -250,12 +1050,12 @@ namespace hexin_csharp
             for (int n = 0; n < nodes.Count; n++)
             {
                 float offset;
-                bool noNeedProcess = false;
+                bool noneedProcess = false;
                 if (((List<Shape>)nodes[n][0])[0].Name.Substring(0, 2) == "C_")
                 {
-                    noNeedProcess = true;
+                    noneedProcess = true;
                 }
-                if (!noNeedProcess)
+                if (!noneedProcess)
                 {
                     List<List<Shape>> blocks = GenerateBlockShapes((List<Shape>)nodes[n][0], (string)nodes[n][1]);
                     List<Shape> prevBlock;
@@ -290,7 +1090,7 @@ namespace hexin_csharp
                             bool canimove = false;
                             for (int s = 0; s < blocks[b].Count; s++)
                             {
-                                // Tips：若找到选项在版心右侧，则说明是横向排列的多个选项。
+                                // @tips：若找到选项在版心右侧，则说明是横向排列的多个选项。
                                 if (blocks[b][s].Left + Utils.ComputeShapeWidth(blocks[b][s]) / 2 > Global.slideWidth / 2)
                                 {
                                     canimove = true;
@@ -383,7 +1183,7 @@ namespace hexin_csharp
                                     }
                                     Shape prevOption = options[o - 1][0];
                                     offset = (float)Utils.ComputeShapeBottom(prevOption) - currentOption.Top;
-                                    offset += (float)HandleTextLineHeight(currentOption, prevOption);
+                                    offset += (float)ComputeTextLineHeight(currentOption, prevOption);
                                     for (int p = 0; p < options[o].Count; p++)
                                     {
                                         options[o][p].Top = options[o][p].Top + offset;
@@ -461,7 +1261,7 @@ namespace hexin_csharp
                                             {
                                                 Offset += 10;
                                             }
-                                            Offset += (float)HandleTextLineHeight(blocks[b][s - 1], blocks[b][s]);
+                                            Offset += (float)ComputeTextLineHeight(blocks[b][s - 1], blocks[b][s]);
                                             for (int o = s; o <= blocks[b].Count; o++)
                                             {
                                                 blocks[b][o].Top += Offset;
@@ -580,7 +1380,7 @@ namespace hexin_csharp
                             // Block 间纵向的排布
                             if (moveBaseBlock != null)
                             {
-                                // Tips：prevShape 需要取逻辑节点中 Bottom 最大的元素。
+                                // @tips：prevShape 需要取逻辑节点中 Bottom 最大的元素。
                                 for (int z = 0; z < moveBaseBlock.Count - 1; z++)
                                 {
                                     for (int x = z + 1; x < moveBaseBlock.Count; x++)
@@ -603,7 +1403,7 @@ namespace hexin_csharp
                                     Offset += 10;
                                 }
                                 // 若相邻的两个文本框都是文字，则进行移动时还需要考虑行距
-                                Offset += (float)HandleTextLineHeight(currentShape, prevShape);
+                                Offset += (float)ComputeTextLineHeight(currentShape, prevShape);
                                 // 需要考虑图文混排的选项部分
                                 if (currentShape.Name.Contains("QC") &&
                                     currentShape.HasTextFrame == MsoTriState.msoTrue &&
@@ -937,7 +1737,7 @@ namespace hexin_csharp
                         {
                             Offset2 += 10;
                         }
-                        Offset2 += HandleTextLineHeight(currentNodeTop, prevNodeBottom);
+                        Offset2 += ComputeTextLineHeight(currentNodeTop, prevNodeBottom);
                         for (int i = n; i < nodes.Count; i++)
                         {
                             for (int k = 0; k < ((List<Shape>)nodes[i][0]).Count; k++)
@@ -975,7 +1775,7 @@ namespace hexin_csharp
         }
 
         // @description 对相邻两个文本元素进行位置移动，保证间距准确
-        static public double HandleTextLineHeight(Shape targetShape, Shape moveBaseShape)
+        static public double ComputeTextLineHeight(Shape targetShape, Shape moveBaseShape)
         {
             double offset = 0;
             // WIP：若相邻的两个文本框都是文字，则进行移动时还需要考虑行距
@@ -1104,7 +1904,7 @@ namespace hexin_csharp
                 bool hasTableimageShape = (shapeLabel == ".table_image");
                 bool hasFixed = (shapeLabel == ".fixed");
                 bool hasInlineImage = Utils.CheckInlineImage(shape);
-                bool hasMatchanswer = Utils.CheckMatchPositionAnswer(shape.Name, shape);
+                bool hasMatchanswer = Utils.CheckMatchPositionAnswer(shape);
                 bool hasChildNode = Utils.CheckHasChildNode(shape);
                 bool hasLongTextanswer = (shape.Name.Contains("haslongtextanswer"));
                 bool hasWb = (shape.Name.Contains("WB"));
@@ -1214,8 +2014,10 @@ namespace hexin_csharp
                     shapeNodeId = shapeNodeId + "#" + "PASEX";
                     hasCollected = true;
                 }
+                // @tips：若当前节点是小题、并且进行过大小题图文布局，则（和没有进行图文布局的部分）当作独立的节点处理。
                 if (!hasCollected && (shape.Name.Contains("AS") || shape.Name.Contains("EX") || shape.Name.Contains("AN")))
                 {
+                    // - 展开的，但是题干是非展开的，拆
                     Shape lastNodeShape = null;
                     if (map.ContainsKey(shapeNodeId))
                     {
@@ -1232,8 +2034,15 @@ namespace hexin_csharp
                             shapeNodeId = shapeNodeId + "#" + "UNLAYOUTEDANASEX";
                             hasCollected = true;
                         }
+                        else if (map.ContainsKey(shapeNodeId + "#" + "UNLAYOUTEDANASEX"))
+                        {
+                            shapeNodeId = shapeNodeId + "#" + "UNLAYOUTEDANASEX";
+                            hasCollected = true;
+                        }
                     }
                 }
+                // @tips：若答案/解析/解题思路进行过图文布局，则当作独立的节点处理。
+                // @todo：若和题干同侧，则这里也可以不拆。
                 if (!hasCollected &&
                     (shape.Name.Contains("AS") || shape.Name.Contains("EX") || shape.Name.Contains("AN")) &&
                     shape.Name.Contains("hastextimagelayout"))
@@ -1265,7 +2074,7 @@ namespace hexin_csharp
                     else
                     {
                         List<Shape> tc = new List<Shape>() { shape };
-                        generateNodeShapes.Add(new object[2] { tc, shapeNodeId });
+                        generateNodeShapes.Add(new object[2] { tc, shapeNodeId }); // 这里把节点的一些语义信息也带上
                         map.Add(shapeNodeId, tc);
                     }
                 }
@@ -1623,6 +2432,416 @@ namespace hexin_csharp
                 }
             }
             return generateBlockShapes;
+        }
+    }
+
+    internal class PositionMatchHandler
+    {
+        static public void MatchAnswerPosition(Shape answerShape, Shape blankShape = null, Shape containerShape = null)
+        {
+            string answerIndex = Regex.Match(answerShape.Name, "vbapositionanswer=(\\d+)").Groups[1].Value;
+            if (blankShape == null || containerShape == null)
+            {
+                Shape[] blankShapes = Utils.FindBlankWithMarkIndex(answerIndex, answerShape);
+                blankShape = blankShapes[0];
+                containerShape = blankShapes[1];
+            }
+            if (blankShape == null)
+            {
+                return;
+            }
+            Match match = Regex.Match(blankShape.TextFrame.TextRange.Text, "@" + answerIndex + "@");
+            ExecuteAnswerPosition(
+                answerShape,
+                blankShape,
+                blankShape.TextFrame.TextRange.Find(match.Value),
+                containerShape);
+        }
+
+        static public void ExecuteAnswerPosition(Shape answerShape, Shape blankShape, TextRange blankMatchRange, Shape containerShape)
+        {
+            Regex regExp = new Regex("vbscript.regexp");
+            // @tips：这里需要注意前面的处理可能造成某些值的变化！！！
+            float matchRangeTop = blankMatchRange.BoundTop;
+            float matchRangeLeft = blankMatchRange.BoundLeft;
+            float matchRangeHeight = blankMatchRange.BoundHeight;
+            float blankShapeWidth = blankShape.Width;
+            float positionLeft = blankMatchRange.BoundLeft - blankShape.Left;
+            float blankFontSize = (float)Utils.GetShapeTextInfo(blankShape)[0];
+            if (containerShape.HasTable == MsoTriState.msoTrue)
+            {
+                matchRangeTop += containerShape.Top;
+                matchRangeLeft += containerShape.Left;
+                positionLeft = blankMatchRange.BoundLeft - blankShape.TextFrame.TextRange.BoundLeft;
+            }
+            if (answerShape.HasTextFrame == MsoTriState.msoTrue)
+            {
+                if (containerShape.HasTable == MsoTriState.msoTrue) // Cell 的宽度、需要考虑两边的留白
+                {
+                    blankShapeWidth -= 10;
+                }
+                bool hasInsertSpaceBefore = false;
+                string shapeLabel = "";
+                if (Regex.IsMatch(answerShape.Name, "([^\\.]+)(\\.[^\\.]+)?#([\\d\\w]+)(\\.\\w+)?"))
+                {
+                    shapeLabel = Regex.Match(answerShape.Name, "([^\\.]+)(\\.[^\\.]+)?#([\\d\\w]+)(\\.\\w+)?").Groups[4].Value;
+                }
+                // @tips：清理支持折行时在前面添加的空格。
+                // @tips：清理支持折行+溢出行内图换行导致的".\\s+.\\s?"部分。
+                int c;
+                for (c = 1; c <= answerShape.TextFrame.TextRange.Length; c++)
+                {
+                    if (answerShape.TextFrame.TextRange.Characters(c).Text != " ")
+                    {
+                        break;
+                    }
+                }
+                if (c > 1)
+                {
+                    answerShape.TextFrame.TextRange.Characters(1, c - 1).Delete();
+                }
+                if (Regex.IsMatch(answerShape.TextFrame.TextRange.Text, "^\\.\\s+\\.\\s+"))
+                {
+                    Match match = Regex.Match(answerShape.TextFrame.TextRange.Text, "^\\.\\s+\\.\\s+");
+                    answerShape.TextFrame.TextRange.Characters(1, match.Length).Delete();
+                }
+                answerShape.TextFrame.MarginBottom = 0;
+                answerShape.TextFrame.MarginRight = 0;
+                answerShape.TextFrame.MarginLeft = 0;
+                answerShape.TextFrame.MarginTop = 0;
+                answerShape.TextFrame.WordWrap = MsoTriState.msoFalse;
+                answerShape.Width = answerShape.TextFrame.TextRange.BoundWidth;
+                answerShape.TextFrame.Ruler.Levels[1].FirstMargin = 0;
+                answerShape.TextFrame.TextRange.ParagraphFormat.Alignment = PpParagraphAlignment.ppAlignLeft;
+                float answerFontSize = (float)Utils.GetShapeTextInfo(answerShape)[0];
+                int blankStart = 0;
+                int blankEnd = 0;
+                int line1 = -1;
+                int line2 = -1;
+                // 找到整个作答空间
+                if ((shapeLabel == ".blank" || shapeLabel == ".bracket") &&
+                    answerShape.TextFrame.TextRange.Lines().Count == 1 &&
+                    !hasInsertSpaceBefore)
+                {
+                    TextRange matchRange = blankMatchRange;
+                    int matchStart = matchRange.Start;
+                    int matchEnd = matchStart + matchRange.Length - 1;
+                    blankStart = 0;
+                    blankEnd = 0;
+                    int i = matchStart - 1;
+                    while (i > 0)
+                    {
+                        if (shapeLabel == ".blank")
+                        { // 找到左边的首个_
+                            if (blankShape.TextFrame.TextRange.Characters(i).Text != "_" &&
+                                !(blankShape.TextFrame.TextRange.Characters(i).Text == " " &&
+                                blankShape.TextFrame.TextRange.Characters(i).Font.Underline == MsoTriState.msoTrue))
+                            {
+                                blankStart = i + 1;
+                                break;
+                            }
+                            else if (blankShape.TextFrame.TextRange.Characters(i).Text == "_" &&
+                                blankShape.TextFrame.TextRange.Characters(i).Font.Color.RGB == ColorTranslator.ToOle(Color.FromArgb(255, 255, 255)))
+                            { // 需要注意避免误伤表格图片的占位下横线
+                                blankStart = i + 1;
+                                break;
+                            }
+                        }
+                        if (shapeLabel == ".bracket")
+                        { // 找到左边的（括号
+                            if (blankShape.TextFrame.TextRange.Characters(i).Text != " ")
+                            {
+                                blankStart = i;
+                                break;
+                            }
+                        }
+                        i--;
+                    }
+                    if (i == 0)
+                    { // 需要考虑 _ 在句首的情况
+                        blankStart = 1;
+                    }
+                    if (i > 1)
+                    { // 需要考虑下横线上连续存在多个填空的情况
+                        if (blankShape.TextFrame.TextRange.Characters(i).Text == "@" &&
+                            Regex.IsMatch(blankShape.TextFrame.TextRange.Characters(i - 1).Text, @"\d+"))
+                        {
+                            blankStart = matchStart - 1;
+                        }
+                    }
+                    i = matchEnd + 1;
+                    while (i <= blankShape.TextFrame.TextRange.Length)
+                    {
+                        if (blankShape.TextFrame.TextRange.Characters(i).Text == " " &&
+                            blankShape.TextFrame.TextRange.Characters(i).Font.Size > (float)Utils.GetShapeTextInfo(blankShape)[0])
+                        { // 跳过撑高空格
+                        }
+                        else if (blankShape.TextFrame.TextRange.Characters(i).Text == "\r")
+                        { // 跳过 WPS 兼容用的换行符
+                        }
+                        else if (shapeLabel == ".blank")
+                        { // 找到右边的最后一个 _，可能是下横线、也可能是空格+下划线
+                            if (blankShape.TextFrame.TextRange.Characters(i).Text != "_" &&
+                                !(blankShape.TextFrame.TextRange.Characters(i).Text == " " &&
+                                    blankShape.TextFrame.TextRange.Characters(i).Font.Underline == MsoTriState.msoTrue))
+                            {
+                                blankEnd = i - 1;
+                                if (blankShape.TextFrame.TextRange.Characters(i - 1).Text == "\r")
+                                {
+                                    blankEnd = i - 2;
+                                }
+                                break;
+                            }
+                        }
+                        else if (shapeLabel == ".bracket")
+                        { // 找到右边的（括号
+                            if (blankShape.TextFrame.TextRange.Characters(i).Text != " ")
+                            {
+                                blankEnd = i;
+                                break;
+                            }
+                        }
+                        i++;
+                    }
+                    if (i == blankShape.TextFrame.TextRange.Length + 1)
+                    {
+                        blankEnd = blankShape.TextFrame.TextRange.Length;
+                    }
+                    line1 = Utils.FindLineNum(blankStart, blankShape, containerShape);
+                    line2 = Utils.FindLineNum(blankEnd, blankShape, containerShape);
+                    // 若答案放置后内容溢出 Shape 宽度，则需要对答案进行换行处理
+                    // - 目前这里考虑如果标记距离元素的左侧很近，目前接受 1 个字宽，则不进行文首缩进
+                    // - 若作答空间本身只有 1 行，则不需要对答案进行折行
+                    // - 若答案和作答空间均只有 1 行，并且其宽度小于作答空间的宽度，则不需要对答案进行折行
+                    bool needWrapped = false;
+                    if (answerShape.Width + positionLeft > blankShapeWidth && blankShape.TextFrame.TextRange.Lines().Count > 1)
+                    {
+                        needWrapped = true;
+                    }
+                    if (needWrapped && blankStart >= 0 && blankEnd > 0)
+                    {
+                        if (line1 == line2 && blankShape.TextFrame.TextRange.Characters(blankStart, blankEnd - blankStart + 1).BoundWidth > answerShape.Width)
+                        {
+                            needWrapped = false;
+                        }
+                    }
+                    if (needWrapped)
+                    {
+                        // @tips：
+                        // 在 PPT 里连续空格、连续下横线可能会出现超出元素边界的情况，
+                        // 所以这里使用元素的宽度进行判断，
+                        // 而不是使用 BoundWidth 进行判断，会大于元素宽度。
+                        answerShape.TextFrame.WordWrap = MsoTriState.msoTrue;
+                        answerShape.Width = blankShapeWidth;
+                        answerShape.Height = answerShape.TextFrame.TextRange.BoundHeight;
+                        answerShape.Left = matchRangeLeft - positionLeft;
+                        // @tips：限制答案宽度不可超过版心。
+                        float viewRight = (float)Utils.GetViewRight();
+                        if (answerShape.Left + answerShape.Width > viewRight)
+                        {
+                            answerShape.Width = viewRight - answerShape.Left;
+                        }
+                        bool needIndent = true;
+                        // @tips：
+                        // 若作答空间只包含答案、并且居中，则不需要对答案进行行首的插空格缩进，
+                        // 便于在下面的逻辑中对答案进行居中操作。
+                        if (Regex.IsMatch(blankShape.TextFrame.TextRange.Text, "^.?[\\@_\\d\\s]+$") &&
+                            blankShape.TextFrame.TextRange.ParagraphFormat.Alignment == PpParagraphAlignment.ppAlignCenter)
+                        {
+                            needIndent = false;
+                        }
+                        if (needIndent && positionLeft >= answerFontSize)
+                        {
+                            // @tips：
+                            // 使用插空格的方式对齐折行答案和填空的位置，
+                            // 替代首行缩进的方式。
+                            answerShape.TextFrame2.TextRange.InsertBefore(" ");
+                            TextRange2 spaceItem = answerShape.TextFrame2.TextRange.Characters[1];
+                            // @tips：
+                            // 这里使用答案字号，而不是更小的字号（字号越小越准确），
+                            // 为了避免出现 1 行空格、1 行答案的情况，
+                            // 行高和填空行高对不齐的情况。
+                            // @todo：可以在单独的环节把上述情况专门处理掉。
+                            spaceItem.Font.Size = answerFontSize;
+                            spaceItem.Font.Name = "SimSun";
+                            if (spaceItem.Font.Spacing < 0)
+                            {
+                                spaceItem.Font.Spacing = spaceItem.Font.Spacing + (-spaceItem.Font.Spacing);
+                            }
+                            double spaceWidth = spaceItem.BoundWidth;
+                            int spaceCount = (int)Math.Round(positionLeft / spaceWidth + 0.5);
+                            i = 1;
+                            string spaceRange = " ";
+                            while (i < spaceCount)
+                            {
+                                spaceRange = spaceRange + " ";
+                                i++;
+                            }
+                            answerShape.TextFrame2.TextRange.Characters[1].Text = spaceRange;
+                            hasInsertSpaceBefore = true;
+                            // @tips：
+                            // 使用插空格的方式，在某些西文的场景下，会空格单独成行、单词换行，
+                            // 导致看起来答案没有对准，
+                            // 这种情况下，改成用行首缩进来实现。
+                            if (answerShape.TextFrame2.TextRange.Lines.Count > (line2 + 1 - line1))
+                            {
+                                for (c = 1; c <= answerShape.TextFrame2.TextRange.Length; c++)
+                                {
+                                    if (answerShape.TextFrame2.TextRange.Characters[c].Text != " ")
+                                    {
+                                        break;
+                                    }
+                                }
+                                if (c > 1)
+                                {
+                                    answerShape.TextFrame2.TextRange.Characters[1, c - 1].Delete();
+                                }
+                                hasInsertSpaceBefore = false;
+                            }
+                        }
+                        if (!hasInsertSpaceBefore) // 若间隙比较小，则使用行首缩进
+                        {
+                            answerShape.TextFrame.Ruler.Levels[1].FirstMargin = positionLeft;
+                        }
+                    }
+                    else
+                    {
+                        // @tips：若答案包含复杂公式，并且进行过图像识别，则认为可以调整为单倍行高。
+                        if (answerShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin < 2 && answerShape.Name.Contains("rh="))
+                        {
+                            answerShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = MsoTriState.msoTrue;
+                            answerShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = 1;
+                        }
+                        answerShape.Width = answerShape.TextFrame.TextRange.BoundWidth;
+                        answerShape.Height = answerShape.TextFrame.TextRange.BoundHeight;
+                        answerShape.Left = matchRangeLeft;
+                    }
+                }
+                // 动起来！！！
+                // 顶部对齐
+                answerShape.Top = matchRangeTop;
+                // - 若答案折行后的结果是第一行为空，则把答案复原，移动到下一行的行首
+                // - 若答案的字号比题干字号大，则在这里设置答案 Top 值时对齐作答空间底部
+                if (answerShape.TextFrame.TextRange.Lines().Count == 1 && !hasInsertSpaceBefore && answerFontSize > blankFontSize)
+                {
+                    answerShape.Top = matchRangeTop + matchRangeHeight - answerShape.Height;
+                }
+                if (answerShape.TextFrame.TextRange.Lines().Count > 1 &&
+                    hasInsertSpaceBefore &&
+                    answerShape.TextFrame.TextRange.Lines(1).Text.Trim().Length == 0 &&
+                    line1 < blankShape.TextFrame.TextRange.Lines().Count)
+                {
+                    for (c = 1; c <= answerShape.TextFrame.TextRange.Length; c++)
+                    {
+                        if (answerShape.TextFrame.TextRange.Characters(c).Text != " ")
+                        {
+                            break;
+                        }
+                    }
+                    if (c > 1)
+                    {
+                        answerShape.TextFrame.TextRange.Characters(1, c - 1).Delete();
+                    }
+                    answerShape.Width = answerShape.TextFrame.TextRange.BoundWidth;
+                    float targetTop = blankShape.TextFrame.TextRange.Lines(line1 + 1).BoundTop;
+                    float targetLeft = blankShape.TextFrame.TextRange.Lines(line1 + 1).BoundLeft;
+                    if (containerShape.HasTable == MsoTriState.msoTrue)
+                    {
+                        targetTop += containerShape.Top;
+                        targetLeft += containerShape.Left;
+                    }
+                    answerShape.Top = targetTop;
+                    answerShape.Left = targetLeft;
+                }
+                // 对填空的答案进行一些偏移，避免答案压在下横线上
+                if (shapeLabel == ".blank")
+                {
+                    float currentTop = answerShape.Top;
+                    // - @todo：对于包含行内图片的答案，观察一下再决定如何处理（在 HandleBlankLineHeight 环节有冗余加些高度
+                    // - 对于纯文本的答案，不需要多进行移动，因为行高都是一样的
+                    // - 对于单行的，包含 g、p、q、y 的答案，多往上移动一点点
+                    // - DISABLED：对于包含公式的答案，多往上移动一点点
+                    // - DISABLED：对于处理过行高的答案，多往上移动一点点
+                    answerShape.Top -= 3;
+                    if (answerShape.TextFrame.TextRange.Lines().Count == 1 &&
+                        Regex.IsMatch(answerShape.TextFrame.TextRange.Text, "[gpqy]"))
+                    {
+                        answerShape.Top = answerShape.Top - 1;
+                    }
+                }
+                // 对答案的位置进行一些偏移，使其可以在空里水平居中
+                // @tips：
+                // 这里还是需要对折行进行判断，
+                // 会出现某些极端的情况，比如说表格里，答案是单行、被认为是折行、但是没有产生折行的情况。
+                if ((shapeLabel == ".blank" || shapeLabel == ".bracket") &&
+                    answerShape.TextFrame.TextRange.Lines().Count == 1 &&
+                    !hasInsertSpaceBefore &&
+                    blankStart > 0 && blankEnd > 0 &&
+                    blankStart < blankEnd)
+                {
+                    float blankWidth = blankShape.TextFrame.TextRange.Characters(blankStart, blankEnd - blankStart + 1).BoundWidth;
+                    float blankLeft = blankShape.TextFrame.TextRange.Characters(blankStart).BoundLeft;
+                    if (containerShape.HasTable == MsoTriState.msoTrue)
+                    {
+                        blankLeft += containerShape.Left;
+                    }
+                    // - 需要注意这里可能存在答案没有换行、但是作答空间换行的情况
+                    bool needProcess = true;
+                    TextRange line = blankShape.TextFrame.TextRange.Lines(line1);
+                    if (Regex.IsMatch(line.Text, @"^_@\d+@(_+)$"))
+                    {
+                        int Length = Regex.Match(line.Text, @"^_@\d+@(_+)$").Groups[0].Value.Length;
+                        needProcess = !(Length > 10);
+                    }
+                    if (line1 == line2 && needProcess)
+                    {
+                        float newLeft = blankLeft + (float)Math.Round((blankWidth - answerShape.Width) / 2 + 0.5);
+                        answerShape.Left = newLeft;
+                    }
+                }
+                // 文本框样式设置为水平居中
+                // - 若答案文本没有超过 1 行、却存在溢出，则居左对齐
+                // - 若答案文本所在的填空是居中的，则居中对齐
+                // - 若答案文本前面存在文首缩进空格，则居左对齐
+                // - 若答案只有 1 行，则居中对齐
+                if (answerShape.TextFrame.TextRange.Lines().Count == 1 &&
+                    answerShape.TextFrame.Ruler.Levels[1].FirstMargin + answerShape.TextFrame.TextRange.BoundWidth > answerShape.Width)
+                {
+                    answerShape.TextFrame.TextRange.ParagraphFormat.Alignment = PpParagraphAlignment.ppAlignLeft;
+                }
+                else if (
+                    answerShape.TextFrame.TextRange.Lines().Count > 1 &&
+                    blankShape.TextFrame.TextRange.ParagraphFormat.Alignment == PpParagraphAlignment.ppAlignCenter
+                )
+                {
+                    answerShape.TextFrame.TextRange.ParagraphFormat.Alignment = PpParagraphAlignment.ppAlignCenter;
+                }
+                else if (hasInsertSpaceBefore)
+                {
+                    answerShape.TextFrame.TextRange.ParagraphFormat.Alignment = PpParagraphAlignment.ppAlignLeft;
+                }
+                else if (answerShape.TextFrame.TextRange.Lines().Count == 1)
+                {
+                    // @tips：一些特殊情况下，会触发 PPT 的幺蛾子机制导致结果很奇怪。
+                    if (!Regex.IsMatch(answerShape.TextFrame.TextRange.Text, @"&\d+&\s+$"))
+                    {
+                        answerShape.TextFrame.TextRange.ParagraphFormat.Alignment = PpParagraphAlignment.ppAlignCenter;
+                    }
+                }
+            }
+            else if (answerShape.Type == MsoShapeType.msoPicture)
+            {
+                answerShape.Left = matchRangeLeft;
+                answerShape.Top = matchRangeTop;
+            }
+            // 跨页答案的剪切
+            if (answerShape.Parent.SlideIndex != containerShape.Parent.SlideIndex)
+            {
+                answerShape.Cut();
+                // @todo：
+                // Utils.Sleep();
+                Global.app.ActivePresentation.Slides[(int)containerShape.Parent.SlideIndex].Shapes.Paste();
+            }
         }
     }
 }

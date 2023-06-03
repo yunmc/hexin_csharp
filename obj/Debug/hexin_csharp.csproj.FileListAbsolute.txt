@@ -6,3 +6,11 @@ C:\Users\Administrator\source\repos\hexin_csharp\obj\Debug\hexin_csharp.csproj.S
 C:\Users\Administrator\source\repos\hexin_csharp\obj\Debug\hexin_csharp.csproj.CoreCompileInputs.cache
 C:\Users\Administrator\source\repos\hexin_csharp\obj\Debug\hexin_csharp.exe
 C:\Users\Administrator\source\repos\hexin_csharp\obj\Debug\hexin_csharp.pdb
+D:\code\hexin_csharp\bin\Debug\hexin_csharp.exe.config
+D:\code\hexin_csharp\bin\Debug\hexin_csharp.exe
+D:\code\hexin_csharp\bin\Debug\hexin_csharp.pdb
+D:\code\hexin_csharp\obj\Debug\hexin_csharp.csproj.AssemblyReference.cache
+D:\code\hexin_csharp\obj\Debug\hexin_csharp.csproj.SuggestedBindingRedirects.cache
+D:\code\hexin_csharp\obj\Debug\hexin_csharp.csproj.CoreCompileInputs.cache
+D:\code\hexin_csharp\obj\Debug\hexin_csharp.exe
+D:\code\hexin_csharp\obj\Debug\hexin_csharp.pdb

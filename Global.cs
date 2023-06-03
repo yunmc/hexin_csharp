@@ -16,7 +16,7 @@ namespace hexin_csharp
         static public Dictionary<string, List<Shape>> GlobalNodeShapeMap = new Dictionary<string, List<Shape>>();
         static public Dictionary<string, Shape> GlobalWbImageMap = new Dictionary<string, Shape>();
         
-        static public float[] GapBetweenTextLine = { -1, -1, -1 };
+        static public double[] GapBetweenTextLine = { -1, -1, -1 };
 
         static public PowerPoint.Application app;
 
@@ -30,10 +30,12 @@ namespace hexin_csharp
         static public float PptViewLeft;
         static public float PptViewRight;
 
+        static public int qcSpaceCount = -1;
+
         static public VbaConfig config;
 
-        static public string PptProjectId = "-1";
-        static public string PptTaskId = "-1";
-        static public string PptSubject = "-1";
+        static public string pptProjectId = "-1";
+        static public string pptTaskId = "-1";
+        static public string pptSubject = "-1";
     }
 }

@@ -104,7 +104,7 @@ namespace hexin_csharp
         }
 
         // @description 获取某个 Shape 里的无标记文本 Runs
-        // Todo：尚未兼容占位用的空格作为分隔符的情况。
+        // @todo：尚未兼容占位用的空格作为分隔符的情况。
         static public List<TextRange> GetShapeRuns(Shape shape)
         {
             List<TextRange> runs = new List<TextRange>();
@@ -348,7 +348,7 @@ namespace hexin_csharp
                     }
                     if (caniuse && character.Font.Size > fontSize)
                     {
-                        // Tips：字号这里需要注意，可能存在单独给题号设置字号的情况，往往比正文要大一些。
+                        // @tips：字号这里需要注意，可能存在单独给题号设置字号的情况，往往比正文要大一些。
                         fontSize = character.Font.Size;
                         fontName = character.Font.Name;
                         fontColor = ColorTranslator.FromOle(character.Font.Color.RGB);
@@ -364,7 +364,7 @@ namespace hexin_csharp
             }
             if (fontSize <= 1)
             {
-                fontSize = Global.GapBetweenTextLine[2];
+                fontSize = (float)Global.GapBetweenTextLine[2];
             }
             return new object[] {
                 fontSize,
@@ -393,10 +393,10 @@ namespace hexin_csharp
                     break;
                 }
             }
-            // Tips：对于只包含占位空格的文本，字号读出来可能是不符合预期的，兜底一下。
+            // @tips：对于只包含占位空格的文本，字号读出来可能是不符合预期的，兜底一下。
             if (fontSize < 10 && Global.GapBetweenTextLine[2] > 0)
             {
-                fontSize = Global.GapBetweenTextLine[2];
+                fontSize = (float)Global.GapBetweenTextLine[2];
             }
             return new object[] {
                 fontSize,
@@ -406,7 +406,7 @@ namespace hexin_csharp
             };
         }
 
-        static public Dictionary<string, object[]>[] GetBlankAndAnswerMap(Slides slides)
+        static public Dictionary<string, object[]>[] GetBlankAndAnswerMap(List<Slide> slides)
         {
             Regex regExp = new Regex(@"([^\.]+)(\.[^\.]+)?#([\d\w]+)(\.\w+)?");
             Dictionary<string, object[]> blankMap = new Dictionary<string, object[]>();
@@ -424,9 +424,9 @@ namespace hexin_csharp
                 }
                 if (hasTable)
                 {
-                    // Tips：获取表格尺寸信息时需要 Focus 在所属页面。
+                    // @tips：获取表格尺寸信息时需要 Focus 在所属页面。
                     Global.app.ActiveWindow.View.GotoSlide(slide.SlideIndex);
-                    // Tips：加一个 1s 的休眠，避免执行太快表格获取尺寸信息不准确。
+                    // @tips：加一个 1s 的休眠，避免执行太快表格获取尺寸信息不准确。
                     Sleep();
                 }
                 foreach (Shape shape in slide.Shapes)
@@ -963,7 +963,7 @@ namespace hexin_csharp
         }
 
         // @description 通过标记找到答案对应的填空元素
-        // Todo：目前没有考虑填空出现在表格里的情况。
+        // @todo：目前没有考虑填空出现在表格里的情况。
         static public Shape[] FindBlankWithMarkIndex(string index, Shape answerShape)
         {
             Shape[] findBlankWithMarkIndex = Global.GlobalBlankMarkIndexMap[index];
@@ -1132,7 +1132,7 @@ namespace hexin_csharp
         }
 
         // @description 通过 node_id 找到元素所在的页索引
-        // Tips：目前只有添加超链接的地方在用，可以先不进行缓存
+        // @tips：目前只有添加超链接的地方在用，可以先不进行缓存
         static public int FindNodeSlide(string targetNodeId)
         {
             foreach (Slide slide in Global.app.ActivePresentation.Slides)
@@ -1165,7 +1165,7 @@ namespace hexin_csharp
         }
 
         // @description 找到非排序状态下元素在当前页中的索引
-        // Tips：目前只有分页批量剪切的地方在用，可以先不进行缓存。
+        // @tips：目前只有分页批量剪切的地方在用，可以先不进行缓存。
         static public int FindSlideShapeIndex(Shape shape, Slide slide)
         {
             for (int i = 1; i <= slide.Shapes.Count; i++)
@@ -1484,7 +1484,7 @@ namespace hexin_csharp
                         if (WbIndex >= l && WbIndex <= r)
                         {
                             findImageWithWbIndex = Global.GlobalWbImageMap[Key];
-                            // Tips：
+                            // @tips：
                             // 经过剪切的元素可以找到，但是调用 API 会报错，
                             // 所以在这里验证一下。
                             float top = findImageWithWbIndex.Top;
@@ -1531,7 +1531,7 @@ namespace hexin_csharp
                 {
                     return shape.Height;
                 }
-                // Tips：对于应用垂直居中的文本，直接返回高度。
+                // @tips：对于应用垂直居中的文本，直接返回高度。
                 if (shape.TextFrame.VerticalAnchor == MsoVerticalAnchor.msoAnchorMiddle)
                 {
                     double height = shape.Height;
@@ -1542,7 +1542,7 @@ namespace hexin_csharp
                     return height;
                 }
                 double shapeHeight = 0;
-                // Tips：
+                // @tips：
                 // Lines 中不存在文本框末尾的空换行，所以这样计算才是真实高度，
                 // 而直接使用 Shape.TextFrame.TextRange.BoundHeight 会包含末尾空换行的高度。
                 for (int i = 1; i <= shape.TextFrame.TextRange.Lines().Count; i++)
@@ -1781,7 +1781,9 @@ namespace hexin_csharp
         // @description 计算行高设置多少能到目标高度
         static public double ComputeTargetLineHeight(Shape shape, double targetHeight, float leftLineHeight = -1)
         {
-            float standardLineHeight = Global.GapBetweenTextLine[0] + Global.GapBetweenTextLine[1] + Global.GapBetweenTextLine[2];
+            float standardLineHeight = (float)Global.GapBetweenTextLine[0] + 
+                (float)Global.GapBetweenTextLine[1] + 
+                (float)Global.GapBetweenTextLine[2];
             float oldSpaceWithin = shape.TextFrame.TextRange.ParagraphFormat.SpaceWithin;
             MsoTriState oldLineRuleWithin = shape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin;
             shape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = MsoTriState.msoFalse;
@@ -1856,104 +1858,101 @@ namespace hexin_csharp
         }
 
         // @description 计算纯文本 2 行文本之间的间距
-        // Tips：（多倍行距的）多行文本中，最后一行文本的高度总是要小于其他行的文本高度的。
+        // @tips：（多倍行距的）多行文本中，最后一行文本的高度总是要小于其他行的文本高度的。
         static public double[] ComputeGapBetweenLines()
         {
-            PowerPoint.Slides Slides = Global.app.ActivePresentation.Slides;
+            PowerPoint.Slides slides = Global.app.ActivePresentation.Slides;
             double[] result = new double[] { 15.5, 0, 1 };
-            // Tips：
+            // @tips：
             // 计算若要对齐两个文本，则需要移动多少距离，
             // 文本+计算出来的距离、减去单倍行距下的文本的高度，就是文本之间需要的间距，
             // 计算时跳过目录页或者标题页。
-            foreach (PowerPoint.Slide Slide in Slides)
+            foreach (PowerPoint.Slide slide in slides)
             {
-                if (!CheckHasCatalog(Slide))
+                if (!CheckHasCatalog(slide))
                 {
-                    foreach (PowerPoint.Shape Shape in Slide.Shapes)
+                    foreach (PowerPoint.Shape shape in slide.Shapes)
                     {
-                        bool Caniuse = false;
-                        if (Shape.HasTextFrame == MsoTriState.msoTrue)
+                        bool caniuse = false;
+                        if (shape.HasTextFrame == MsoTriState.msoTrue)
                         {
-                            if (Regex.IsMatch(Shape.TextFrame.TextRange.Text, @"<m>"))
+                            if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"<m>"))
                             {
-                                Caniuse = true;
+                                caniuse = true;
                             }
-                            else if ((Shape.Name.Substring(0, 1) == "P" || Shape.Name.Substring(0, 1) == "Q") && Shape.TextFrame.TextRange.Length > 0)
+                            else if ((shape.Name.Substring(0, 1) == "P" || shape.Name.Substring(0, 1) == "Q") &&
+                                shape.TextFrame.TextRange.Length > 0)
                             {
-                                Caniuse = true;
+                                caniuse = true;
                             }
                         }
-                        if (Caniuse)
+                        if (caniuse)
                         {
-                            // ********************* 
                             // 新建一页用于计算，使用后删掉 
-                            // ********************* 
-                            PowerPoint.Slide NewSlide = Slides.AddSlide(Slide.SlideIndex + 1, Slide.CustomLayout);
-                            // ********************* 
+                            PowerPoint.Slide newSlide = slides.AddSlide(slide.SlideIndex + 1, slide.CustomLayout);
                             // 计算字号、字体 
-                            // ********************* 
-                            float FontSize = 0;
-                            string FontNameFarEast = "";
-                            for (int f = 1; f <= Shape.TextFrame.TextRange.Length; f++)
+                            float fontSize = 0;
+                            string fontNameFarEast = "";
+                            for (int f = 1; f <= shape.TextFrame.TextRange.Length; f++)
                             {
-                                PowerPoint.TextRange Characters = Shape.TextFrame.TextRange.Characters(f);
-                                if (Characters.Font.Size > FontSize)
+                                PowerPoint.TextRange character = shape.TextFrame.TextRange.Characters(f);
+                                if (character.Font.Size > fontSize)
                                 {
-                                    FontSize = Characters.Font.Size;
+                                    fontSize = character.Font.Size;
                                 }
-                                if (Characters.Font.Size >= FontSize &&
-                                    Characters.Text != " " &&
-                                    Characters.Text != "_" &&
-                                    Characters.Font.NameFarEast.Length > 0 &&
-                                    FontNameFarEast.Length <= 0)
+                                if (character.Font.Size >= fontSize &&
+                                    character.Text != " " &&
+                                    character.Text != "_" &&
+                                    character.Font.NameFarEast.Length > 0 &&
+                                    fontNameFarEast.Length <= 0)
                                 {
-                                    FontNameFarEast = Characters.Font.NameFarEast;
+                                    fontNameFarEast = character.Font.NameFarEast;
                                 }
                             }
-                            // ********************* 
                             // 计算行高 
-                            // ********************* 
-                            float SpaceWithin = -1;
-                            for (int p = 1; p <= Shape.TextFrame.TextRange.Paragraphs().Count; p++)
+                            float spaceWithin = -1;
+                            for (int p = 1; p <= shape.TextFrame.TextRange.Paragraphs().Count; p++)
                             {
-                                PowerPoint.TextRange Paragraphs = Shape.TextFrame.TextRange.Paragraphs(p);
-                                if (Paragraphs.ParagraphFormat.SpaceWithin > SpaceWithin)
+                                PowerPoint.TextRange paragraph = shape.TextFrame.TextRange.Paragraphs(p);
+                                if (paragraph.ParagraphFormat.SpaceWithin > spaceWithin)
                                 {
-                                    SpaceWithin = Paragraphs.ParagraphFormat.SpaceWithin;
+                                    spaceWithin = paragraph.ParagraphFormat.SpaceWithin;
                                 }
                             }
-                            // ********************* 
-                            // 创建 1 个 2 行的纯文本的文本框 
-                            // ********************* 
-                            PowerPoint.Shape TextShape = NewSlide.Shapes.AddTextbox(MsoTextOrientation.msoTextOrientationHorizontal, 100, 100, 400, 400);
-                            TextShape.TextFrame.TextRange.Text = "测" + "\r" + "试";
-                            TextShape.TextFrame.TextRange.Font.Size = FontSize;
-                            TextShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = (SpaceWithin < 2) ? MsoTriState.msoTrue : MsoTriState.msoFalse;
-                            TextShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = SpaceWithin;
-                            TextShape.TextFrame.MarginBottom = 0;
-                            TextShape.TextFrame.MarginRight = 0;
-                            TextShape.TextFrame.MarginLeft = 0;
-                            TextShape.TextFrame.MarginTop = 0;
-                            // ********************* 
-                            // 计算若要对齐两个文本，则需要移动多少距离 
-                            // ********************* 
-                            double LineHeight1 = TextShape.TextFrame.TextRange.Lines(1).BoundHeight;
-                            double LineHeight2 = TextShape.TextFrame.TextRange.Lines(2).BoundHeight;
-                            // Todo：存在部分字体会导致多行的行高一样，这里需要处理得再精细一些。 
-                            if (LineHeight1 - LineHeight2 > 0)
+                            // 创建 1 个 2 行的纯文本的文本框
+                            PowerPoint.Shape textShape = newSlide.Shapes.AddTextbox(MsoTextOrientation.msoTextOrientationHorizontal, 100, 100, 400, 400);
+                            textShape.TextFrame.TextRange.Text = "测" + "\r" + "试";
+                            textShape.TextFrame.TextRange.Font.Size = fontSize;
+                            textShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = (spaceWithin < 2) ? MsoTriState.msoTrue : MsoTriState.msoFalse;
+                            textShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = spaceWithin;
+                            textShape.TextFrame.MarginBottom = 0;
+                            textShape.TextFrame.MarginRight = 0;
+                            textShape.TextFrame.MarginLeft = 0;
+                            textShape.TextFrame.MarginTop = 0;
+                            // 计算若要对齐两个文本，则需要移动多少距离
+                            double lineHeight1 = textShape.TextFrame.TextRange.Lines(1).BoundHeight;
+                            double lineHeight2 = textShape.TextFrame.TextRange.Lines(2).BoundHeight;
+                            // @todo：存在部分字体会导致多行的行高一样，这里需要处理得再精细一些。 
+                            if (lineHeight1 == lineHeight2)
                             {
-                                // ********************* 
-                                // 文本+计算出来的距离、减去单倍行距下的文本的高度、除以2，就是文本之间需要的间距 
-                                // ********************* 
-                                double OldHeight = TextShape.TextFrame.TextRange.BoundHeight + LineHeight1 - LineHeight2;
-                                TextShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = MsoTriState.msoTrue;
-                                TextShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = 1;
-                                double NewHeight = TextShape.TextFrame.TextRange.BoundHeight;
-                                result = new double[] { (OldHeight - NewHeight) / 2, LineHeight1 - LineHeight2, FontSize };
-                                NewSlide.Delete();
+                                lineHeight2 = textShape.TextFrame.TextRange.BoundHeight - lineHeight1;
+                            }
+                            if (lineHeight1 == lineHeight2)
+                            {
+                                lineHeight2 = textShape.Height - lineHeight1;
+                            }
+                            if (lineHeight1 - lineHeight2 > 0 && lineHeight2 > 0)
+                            {
+                                // 文本+计算出来的距离、减去单倍行距下的文本的高度、除以2，就是文本之间需要的间距  
+                                double oldHeight = textShape.TextFrame.TextRange.BoundHeight + lineHeight1 - lineHeight2;
+                                textShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = MsoTriState.msoTrue;
+                                textShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = 1;
+                                double NewHeight = textShape.TextFrame.TextRange.BoundHeight;
+                                result = new double[] { (oldHeight - NewHeight) / 2, lineHeight1 - lineHeight2, fontSize };
+                                newSlide.Delete();
                                 return result;
                             }
-                            NewSlide.Delete();
+                            newSlide.Delete();
                         }
                     }
                 }
@@ -2124,7 +2123,7 @@ namespace hexin_csharp
         static public bool CheckWrappedAnswerShape(Shape targetAnswerShape)
         {
             bool result = false;
-            if (!CheckMatchPositionAnswer(targetAnswerShape.Name, targetAnswerShape))
+            if (!CheckMatchPositionAnswer(targetAnswerShape))
             {
                 return result;
             }
@@ -2300,7 +2299,7 @@ namespace hexin_csharp
 
         static public bool CheckXOverShapes(Shape shape1, Shape shape2, Slide slide1, Slide slide2, int e)
         {
-            if (CheckMatchPositionAnswer(shape1.Name, shape1) || CheckMatchPositionAnswer(shape2.Name, shape2))
+            if (CheckMatchPositionAnswer(shape1) || CheckMatchPositionAnswer(shape2))
             {
                 return false;
             }
@@ -2308,7 +2307,7 @@ namespace hexin_csharp
             {
                 return false;
             }
-            // Tips：注意这里使用 .Width 而不是 ComputeShapeWidth(Shape)。
+            // @tips：注意这里使用 .Width 而不是 ComputeShapeWidth(Shape)。
             if (!((shape1.Left >= shape2.Left + shape2.Width - e) || (shape1.Left + shape1.Width - e <= shape2.Left)))
             {
                 return true;
@@ -2441,7 +2440,7 @@ namespace hexin_csharp
                     return true;
                 }
             }
-            // Tips：其中 1 个是图片的情况，Shape1 为图片、Shape2 为文本
+            // @tips：其中 1 个是图片的情况，Shape1 为图片、Shape2 为文本
             if ((shape1.HasTextFrame == MsoTriState.msoTrue && shape2.HasTextFrame == MsoTriState.msoFalse) ||
                 (shape2.HasTextFrame == MsoTriState.msoTrue && shape1.HasTextFrame == MsoTriState.msoFalse))
             {
@@ -2470,7 +2469,7 @@ namespace hexin_csharp
             }
             if (shape1.HasTextFrame == MsoTriState.msoTrue && shape2.HasTextFrame == MsoTriState.msoTrue)
             {
-                // Tips：都是文本的情况
+                // @tips：都是文本的情况
                 for (int k = 1; k <= shape1.TextFrame.TextRange.Lines().Count; k++)
                 {
                     TextRange line1 = shape1.TextFrame.TextRange.Lines(k, 1);
@@ -2495,7 +2494,7 @@ namespace hexin_csharp
             return false;
         }
 
-        // ' @description 判断是否是需要位置匹配的元素
+        // @description 判断是否是需要位置匹配的元素
         // - 需要匹配位置的答案
         // - inline image
         // - table image
@@ -2510,7 +2509,7 @@ namespace hexin_csharp
                 bool hasTableImageShape = shapeLabel == ".table_image";
                 bool hasFixed = shapeLabel == ".fixed";
                 bool hasInlineImage = CheckInlineImage(shape);
-                bool hasMatchAnswer = CheckMatchPositionAnswer(shape.Name, shape);
+                bool hasMatchAnswer = CheckMatchPositionAnswer(shape);
                 return hasTableImageShape ||
                     hasFixed ||
                     hasInlineImage ||
@@ -2640,7 +2639,7 @@ namespace hexin_csharp
                     }
                     else if (shapes[i].Name == shapes[index].Name)
                     {
-                        // Tips：
+                        // @tips：
                         // 若节点上方存在同名节点，则不当做独立的节点进行判断，
                         // 因为在上面的节点已经做过分页处理，
                         // 不再进行冗余的判断、避免过度切分。
@@ -2727,10 +2726,10 @@ namespace hexin_csharp
                 {
                     break;
                 }
-                // Tips：
+                // @tips：
                 // - 无视掉需要匹配位置的答案
                 // - 无视掉当前元素的父节点
-                if (!CheckMatchPositionAnswer(sortedShapes[i].Name, sortedShapes[i]) &&
+                if (!CheckMatchPositionAnswer(sortedShapes[i]) &&
                     !shape.Name.Contains("parentnodeid=" + GetShapeInfo(sortedShapes[i])[0]))
                 {
                     firstShape = sortedShapes[i];
@@ -2742,7 +2741,7 @@ namespace hexin_csharp
                 return false;
             }
             PowerPoint.Shape lastShape = prevSlide.Shapes[prevSlide.Shapes.Count];
-            // Tips：
+            // @tips：
             // 目前暂时接受试题节点上方被分页的是段落节点。
             // 需要考虑使用 PPT 预处理工具手动段落内分页的情况。
             return GetShapeInfo(lastShape)[0] == GetShapeInfo(firstShape)[0] && !firstShape.Name.StartsWith("P");
@@ -2750,9 +2749,9 @@ namespace hexin_csharp
 
 
         // @description 判断 Shape 是否是需要位置匹配的答案
-        static public bool CheckMatchPositionAnswer(string shapeName, Shape shape)
+        static public bool CheckMatchPositionAnswer(Shape shape)
         {
-            return shapeName.Contains("vbapositionanswer");
+            return shape.Name.Contains("vbapositionanswer");
         }
 
         static public bool CheckEmptyTable(Shape shape)
@@ -2895,7 +2894,7 @@ namespace hexin_csharp
         // @params lineRange - LineRange
         // @params textRange - TextRange
         // @params inline - 是否接受不在文本框的首行或者尾行
-        // @todo：当前分页逻辑待删除。
+        // @@todo：当前分页逻辑待删除。
         public bool CheckLineParagraphTitle(int index, TextRange lineRange, TextRange textRange, bool inline = false)
         {
             bool checkChr13End = lineRange.Characters(lineRange.Length).Text == "\r"; // chr(13)
@@ -2955,7 +2954,7 @@ namespace hexin_csharp
 
         static public bool CheckIsExpaned(Shape shape)
         {
-            // Tips：
+            // @tips：
             // 判断节点是否是展开的，不能用中心做比较，因为可能存在左右 Padding 配置不一样的情况，
             // 同时也不可以直接用 hastextimage 标记判断，因为容器内可能存在展开的元素，
             // 目前建议用距离版心左右的距离来判断。
@@ -3039,7 +3038,7 @@ namespace hexin_csharp
         static public bool Check75Options(Shape Shape)
         {
             bool result = false;
-            if (Global.PptSubject == "english" &&
+            if (Global.pptSubject == "english" &&
                 Shape.Name.StartsWith("QM") &&
                 !CheckMatchPositionShape(Shape) &&
                 Shape.Left > Global.slideWidth / 2 &&
@@ -3085,7 +3084,9 @@ namespace hexin_csharp
         static public bool CheckRangeHigherAvgLineHeight(Shape shape, int l, int r, float avgLineHeight, int e)
         {
             bool checkRangeHigherAvgLineHeight = false;
-            float standardLineHeight = Global.GapBetweenTextLine[0] + Global.GapBetweenTextLine[1] + Global.GapBetweenTextLine[2];
+            float standardLineHeight = (float)Global.GapBetweenTextLine[0] +
+                (float)Global.GapBetweenTextLine[1] +
+                (float)Global.GapBetweenTextLine[2];
             int charCount = 0;
             int prevCharCount;
             float fontSize = (float)GetShapeTextInfo(shape)[0];
@@ -3094,7 +3095,9 @@ namespace hexin_csharp
                 TextRange line = shape.TextFrame.TextRange.Lines(i);
                 prevCharCount = charCount;
                 charCount += line.Length;
-                if ((prevCharCount < l && charCount >= l) || (prevCharCount < r && charCount > r) || (charCount > l && charCount <= r))
+                if ((prevCharCount < l && charCount >= l) || 
+                    (prevCharCount < r && charCount > r) || 
+                    (charCount > l && charCount <= r))
                 {
                     if (line.BoundHeight > avgLineHeight + e)
                     {
@@ -3154,7 +3157,7 @@ namespace hexin_csharp
                 if (paragraph.Lines(i).Characters().Count <= 3 && i > 1)
                 {
                     checkParagraphShortText = true;
-                    // Tips：
+                    // @tips：
                     // 若某行只有 1 个空格，那么认为不存在小尾巴，
                     // 留在句首标点的环节去处理。
                     if (Regex.IsMatch(paragraph.Lines(i).Characters(1).Text, @"[!),.:;?\]、。—ˇ¨〃々～‖…’”〕〉》」』〗】∶！＇），．：；？］｀｜｝]"))
@@ -3169,7 +3172,7 @@ namespace hexin_csharp
                 {
                     string answerIndex = m.Groups[1].Value;
                     Shape answerShape = FindAnswerWithMarkIndex(answerIndex, containerShape.Parent.SlideIndex);
-                    // Tips：
+                    // @tips：
                     // 若文本是填空题干，那么由于缩小题干字间距的话，也需要相应缩小其答案的字间距，
                     // 那么答案是否允许缩进，也需要进行判断。
                     if (answerShape != null)
@@ -3279,7 +3282,7 @@ namespace hexin_csharp
             List<Shape> tc = new List<Shape>();
             for (int i = 0; i < shortBlankCollection.Count; i++)
             {
-                if (!CheckMatchPositionAnswer(shortBlankCollection[i].Name, shortBlankCollection[i]) &&
+                if (!CheckMatchPositionAnswer(shortBlankCollection[i]) &&
                     !shortBlankCollection[i].Name.StartsWith("C_"))
                 {
                     tc.Add(shortBlankCollection[i]);
@@ -3411,7 +3414,7 @@ namespace hexin_csharp
                     }
                     else if (shape.Name.Contains("AN")) // 答案
                     {
-                        if (!CheckMatchPositionAnswer(shape.Name, shape))
+                        if (!CheckMatchPositionAnswer(shape))
                         {
                             if (Regex.IsMatch(shape.TextFrame.TextRange.Text, r2))
                             {
@@ -3452,7 +3455,7 @@ namespace hexin_csharp
             }
         }
 
-        // @todo：建议全部删除标记相关的函数封装在 DeleteMark 里。
+        // @@todo：建议全部删除标记相关的函数封装在 DeleteMark 里。
         // @description 删除辅助精排 Ppt 的标记和标签
         static public void DeleteMark(Slide slide)
         {
@@ -3534,24 +3537,24 @@ namespace hexin_csharp
                                 }
                                 // 删除 #b# 这一段！！！
                                 textRange.Paragraphs(l, 1).Delete();
-                                // Tips：这里要注意还原下一行的对齐方式。
+                                // @tips：这里要注意还原下一行的对齐方式。
                                 if (alignment != -1)
                                 {
                                     textRange.Paragraphs(l + 1, 1).ParagraphFormat.Alignment = alignment;
                                 }
-                                // Tips：这里要注意还原下一个 P 的段首空格，不知道为什么会被 PPT 删掉。
-                                // Tips：这里要注意除字体外还要还原下划线样式。
+                                // @tips：这里要注意还原下一个 P 的段首空格，不知道为什么会被 PPT 删掉。
+                                // @tips：这里要注意除字体外还要还原下划线样式。
                                 if (spaceCount > 0 && textRange.Paragraphs(l, 1).Characters(1).Text != " ")
                                 {
                                     for (int s = spaceCount; s >= 1; s--)
                                     {
                                         textRange.Paragraphs(l, 1).InsertBefore(" ");
                                     }
-                                    // Tips：这里要进行完整的拼写，否则会出现 With 不到最新数据的情况。
+                                    // @tips：这里要进行完整的拼写，否则会出现 With 不到最新数据的情况。
                                     textRange.Paragraphs(l, 1).Characters(1, spaceCount).Font.Name = fontName;
                                     textRange.Paragraphs(l, 1).Characters(1, spaceCount).Font.Underline = fontUnderLine;
                                 }
-                                // Tips：这里要注意避免误伤其他行的行高。
+                                // @tips：这里要注意避免误伤其他行的行高。
                                 if (lineHeight != -1)
                                 {
                                     textRange.Paragraphs(l + 1, 1).ParagraphFormat.LineRuleWithin = lineRuleWithin;
@@ -3635,7 +3638,7 @@ namespace hexin_csharp
             {
                 return;
             }
-            // Tips：根据标记进行 Runs 的分割，避免误伤标记的字间距。
+            // @tips：根据标记进行 Runs 的分割，避免误伤标记的字间距。
             if (RegExp.IsMatch(textRange.Text))
             {
                 int PrevMatchStart;
@@ -3666,7 +3669,7 @@ namespace hexin_csharp
             {
                 Runs.Add(textRange2);
             }
-            // Tips：先记录一遍每个 Run 的原始数据，避免公式多次加减。
+            // @tips：先记录一遍每个 Run 的原始数据，避免公式多次加减。
             for (int i = 0; i < Runs.Count; i++)
             {
                 for (int j = 0; j < Runs[i].Count; j++)
