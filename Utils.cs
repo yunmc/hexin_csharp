@@ -364,7 +364,7 @@ namespace hexin_csharp
             }
             if (fontSize <= 1)
             {
-                fontSize = (float)Global.GapBetweenTextLine[2];
+                fontSize = (float)Global.gapBetweenTextLine[2];
             }
             return new object[] {
                 fontSize,
@@ -394,9 +394,9 @@ namespace hexin_csharp
                 }
             }
             // @tips：对于只包含占位空格的文本，字号读出来可能是不符合预期的，兜底一下。
-            if (fontSize < 10 && Global.GapBetweenTextLine[2] > 0)
+            if (fontSize < 10 && Global.gapBetweenTextLine[2] > 0)
             {
-                fontSize = (float)Global.GapBetweenTextLine[2];
+                fontSize = (float)Global.gapBetweenTextLine[2];
             }
             return new object[] {
                 fontSize,
@@ -559,9 +559,9 @@ namespace hexin_csharp
         // @description 获取可视区最小 Shape.Left
         static public double GetViewLeft()
         {
-            if (Global.PptViewLeft > 0)
+            if (Global.pptViewLeft > 0)
             {
-                return Global.PptViewLeft;
+                return Global.pptViewLeft;
             }
             double getViewLeft = 99999;
             foreach (Slide slide in Global.app.ActivePresentation.Slides)
@@ -583,16 +583,16 @@ namespace hexin_csharp
             {
                 getViewLeft = Global.viewLeft;
             }
-            Global.PptViewLeft = (float)getViewLeft;
+            Global.pptViewLeft = (float)getViewLeft;
             return getViewLeft;
         }
 
         // @description 获取可视区最大 Shape.Right
         static public double GetViewRight()
         {
-            if (Global.PptViewRight > 0)
+            if (Global.pptViewRight > 0)
             {
-                return Global.PptViewRight;
+                return Global.pptViewRight;
             }
             double getViewRight = 1;
             foreach (Slide slide in Global.app.ActivePresentation.Slides)
@@ -614,7 +614,7 @@ namespace hexin_csharp
             {
                 getViewRight = Global.viewRight;
             }
-            Global.PptViewRight = (float)getViewRight;
+            Global.pptViewRight = (float)getViewRight;
             return getViewRight;
         }
 
@@ -1525,11 +1525,22 @@ namespace hexin_csharp
         {
             try
             {
-                if (shape.HasTextFrame == MsoTriState.msoTrue ||
+                if (shape.HasTextFrame == MsoTriState.msoFalse ||
                     shape.Name.Contains("WB") ||
                     shape.Name.Contains("jb-part"))
                 {
                     return shape.Height;
+                }
+                // @tips：对于识别过有效高度的元素，返回 real height。
+                if (Regex.IsMatch(shape.Name, @"rh=(\d+\.?\d+)"))
+                {
+                    double h = Convert.ToDouble(Regex.Match(shape.Name, @"rh=(\d+\.?\d+)").Groups[1].Value);
+                    // 若 real_height 和当前答案的高度差距很大，则有可能是识别错误，也有可能是空白就这么大
+                    if (h < shape.TextFrame.TextRange.BoundHeight &&
+                        Math.Abs(h - shape.TextFrame.TextRange.BoundHeight) < Global.gapBetweenTextLine[2])
+                    {
+                        return h;
+                    }
                 }
                 // @tips：对于应用垂直居中的文本，直接返回高度。
                 if (shape.TextFrame.VerticalAnchor == MsoVerticalAnchor.msoAnchorMiddle)
@@ -1559,7 +1570,7 @@ namespace hexin_csharp
                 }
                 computeShapeHeight += shape.TextFrame.MarginTop;
                 computeShapeHeight += shape.TextFrame.MarginBottom;
-                if (shape.Name.Contains("C") && shape.Height > computeShapeHeight)
+                if (shape.Name.StartsWith("C") && shape.Height > computeShapeHeight)
                 {
                     computeShapeHeight = shape.Height;
                 }
@@ -1781,9 +1792,9 @@ namespace hexin_csharp
         // @description 计算行高设置多少能到目标高度
         static public double ComputeTargetLineHeight(Shape shape, double targetHeight, float leftLineHeight = -1)
         {
-            float standardLineHeight = (float)Global.GapBetweenTextLine[0] + 
-                (float)Global.GapBetweenTextLine[1] + 
-                (float)Global.GapBetweenTextLine[2];
+            float standardLineHeight = (float)Global.gapBetweenTextLine[0] + 
+                (float)Global.gapBetweenTextLine[1] + 
+                (float)Global.gapBetweenTextLine[2];
             float oldSpaceWithin = shape.TextFrame.TextRange.ParagraphFormat.SpaceWithin;
             MsoTriState oldLineRuleWithin = shape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin;
             shape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = MsoTriState.msoFalse;
@@ -1890,6 +1901,7 @@ namespace hexin_csharp
                         {
                             // 新建一页用于计算，使用后删掉 
                             PowerPoint.Slide newSlide = slides.AddSlide(slide.SlideIndex + 1, slide.CustomLayout);
+                            Global.app.ActiveWindow.View.GotoSlide(newSlide.SlideIndex);
                             // 计算字号、字体 
                             float fontSize = 0;
                             string fontNameFarEast = "";
@@ -1900,7 +1912,8 @@ namespace hexin_csharp
                                 {
                                     fontSize = character.Font.Size;
                                 }
-                                if (character.Font.Size >= fontSize &&
+                                if (character.Length == 1 &&
+                                    character.Font.Size >= fontSize &&
                                     character.Text != " " &&
                                     character.Text != "_" &&
                                     character.Font.NameFarEast.Length > 0 &&
@@ -1920,25 +1933,23 @@ namespace hexin_csharp
                                 }
                             }
                             // 创建 1 个 2 行的纯文本的文本框
-                            PowerPoint.Shape textShape = newSlide.Shapes.AddTextbox(MsoTextOrientation.msoTextOrientationHorizontal, 100, 100, 400, 400);
-                            textShape.TextFrame.TextRange.Text = "测" + "\r" + "试";
+                            PowerPoint.Shape textShape = newSlide.Shapes.AddTextbox(MsoTextOrientation.msoTextOrientationHorizontal, 100, 100, 100, 100);
+                            textShape.TextFrame.TextRange.Text = "测试";
                             textShape.TextFrame.TextRange.Font.Size = fontSize;
+                            textShape.TextFrame.TextRange.Font.Name = "SimSun";
+                            textShape.TextFrame.TextRange.Font.NameFarEast = "SimSun";
                             textShape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin = (spaceWithin < 2) ? MsoTriState.msoTrue : MsoTriState.msoFalse;
                             textShape.TextFrame.TextRange.ParagraphFormat.SpaceWithin = spaceWithin;
                             textShape.TextFrame.MarginBottom = 0;
                             textShape.TextFrame.MarginRight = 0;
                             textShape.TextFrame.MarginLeft = 0;
                             textShape.TextFrame.MarginTop = 0;
+                            textShape.TextFrame.TextRange.Characters(1).InsertAfter("\r");
                             // 计算若要对齐两个文本，则需要移动多少距离
                             double lineHeight1 = textShape.TextFrame.TextRange.Lines(1).BoundHeight;
                             double lineHeight2 = textShape.TextFrame.TextRange.Lines(2).BoundHeight;
-                            // @todo：存在部分字体会导致多行的行高一样，这里需要处理得再精细一些。 
-                            if (lineHeight1 == lineHeight2)
-                            {
-                                lineHeight2 = textShape.TextFrame.TextRange.BoundHeight - lineHeight1;
-                            }
-                            if (lineHeight1 == lineHeight2)
-                            {
+                            if (Math.Abs(lineHeight1 - lineHeight2) < 1)
+                            { 
                                 lineHeight2 = textShape.Height - lineHeight1;
                             }
                             if (lineHeight1 - lineHeight2 > 0 && lineHeight2 > 0)
@@ -2054,6 +2065,37 @@ namespace hexin_csharp
             return 0;
         }
 
+        static public bool CheckTitlePage(Slide slide)
+        {
+            foreach (Shape shape in slide.Shapes)
+            { 
+                if (!Regex.IsMatch(shape.Name, @"^C_"))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static public int CheckHasLargeFormula(TextRange range)
+        {
+            if (!Regex.IsMatch(range.Text, @"m>"))
+            {
+                return -1;
+            }
+            float aLineHeight = (float)Math.Round(range.BoundHeight / range.Lines().Count + 0.5);
+            double e = Global.gapBetweenTextLine[0];
+            if (aLineHeight / Global.standardLineHeight > 1.6)
+            { // 超高公式，大括号、矩阵，设置为1.1倍行高
+                return 2;
+            }
+            else if (aLineHeight - Global.standardLineHeight > e)
+            { // 较高公式，尝试用普通文本的行高来处理
+                return 1;
+            }
+            return -1;
+        }
+
         static public bool CheckHasQnumCatalog(PowerPoint.Shape shape, float viewBottom)
         {
             if (shape.HasTextFrame == MsoTriState.msoFalse)
@@ -2104,7 +2146,7 @@ namespace hexin_csharp
             return false;
         }
 
-        public bool CheckHasTallSpace(TextRange textRange, Shape shape)
+        static public bool CheckHasTallSpace(TextRange textRange, Shape shape)
         {
             bool result = false;
             float FontSize = (float)GetShapeTextInfo(shape)[0];
@@ -3084,9 +3126,9 @@ namespace hexin_csharp
         static public bool CheckRangeHigherAvgLineHeight(Shape shape, int l, int r, float avgLineHeight, int e)
         {
             bool checkRangeHigherAvgLineHeight = false;
-            float standardLineHeight = (float)Global.GapBetweenTextLine[0] +
-                (float)Global.GapBetweenTextLine[1] +
-                (float)Global.GapBetweenTextLine[2];
+            float standardLineHeight = (float)Global.gapBetweenTextLine[0] +
+                (float)Global.gapBetweenTextLine[1] +
+                (float)Global.gapBetweenTextLine[2];
             int charCount = 0;
             int prevCharCount;
             float fontSize = (float)GetShapeTextInfo(shape)[0];
