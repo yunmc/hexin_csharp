@@ -576,8 +576,7 @@ namespace hexin_csharp
                                     { // 若答案没有比作答空间行高高多少，则尝试保留不换行
                                         neediprocess = false;
                                     }
-                                    else
-                                    if (shape.Left + shape.Width - positionLeft < answerFontSize * 1.5)
+                                    else if (shape.Left + shape.Width - positionLeft < answerFontSize * 1.5)
                                     { // 若答案只会在当前行留下比较短的内容
                                         neediprocess = true;
                                     }
@@ -822,10 +821,6 @@ namespace hexin_csharp
 
         static public void HandleFlushLineHeight(int currentLineIndex, Shape shape, Shape containerShape, Slide slide)
         {
-            if (slide.SlideIndex == 36)
-            {
-                Console.WriteLine("stop");
-            }
             // @todo：对多行答案的处理，解决答案压线的问题。
             // @tips：这里需要注意，有些段落由于没有拆分的跨行公式，是可能多行的。
             int currentParagraphIndex = Utils.FindLineParagragh(currentLineIndex, shape)[0];
