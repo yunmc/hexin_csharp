@@ -15,7 +15,7 @@ namespace hexin_csharp
         static public Dictionary<string, Shape> GlobalAnswerMarkIndexMap = new Dictionary<string, Shape>();
         static public Dictionary<string, List<Shape>> GlobalNodeShapeMap = new Dictionary<string, List<Shape>>();
         static public Dictionary<string, Shape> GlobalWbImageMap = new Dictionary<string, Shape>();
-        
+
         static public double[] gapBetweenTextLine = { -1, -1, -1 };
 
         static public PowerPoint.Application app;

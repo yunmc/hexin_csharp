@@ -122,7 +122,8 @@ namespace hexin_csharp
                     for (int j = 1; j <= colCount; j++)
                     {
                         int textLength = table.Cell(i, j).Shape.TextFrame.TextRange.Length;
-                        if (textLength == 0) {
+                        if (textLength == 0)
+                        {
                             continue;
                         }
                         if (regex.IsMatch(table.Cell(i, j).Shape.TextFrame.TextRange.Text))
@@ -1792,8 +1793,8 @@ namespace hexin_csharp
         // @description 计算行高设置多少能到目标高度
         static public double ComputeTargetLineHeight(Shape shape, double targetHeight, float leftLineHeight = -1)
         {
-            float standardLineHeight = (float)Global.gapBetweenTextLine[0] + 
-                (float)Global.gapBetweenTextLine[1] + 
+            float standardLineHeight = (float)Global.gapBetweenTextLine[0] +
+                (float)Global.gapBetweenTextLine[1] +
                 (float)Global.gapBetweenTextLine[2];
             float oldSpaceWithin = shape.TextFrame.TextRange.ParagraphFormat.SpaceWithin;
             MsoTriState oldLineRuleWithin = shape.TextFrame.TextRange.ParagraphFormat.LineRuleWithin;
@@ -1949,7 +1950,7 @@ namespace hexin_csharp
                             double lineHeight1 = textShape.TextFrame.TextRange.Lines(1).BoundHeight;
                             double lineHeight2 = textShape.TextFrame.TextRange.Lines(2).BoundHeight;
                             if (Math.Abs(lineHeight1 - lineHeight2) < 1)
-                            { 
+                            {
                                 lineHeight2 = textShape.Height - lineHeight1;
                             }
                             if (lineHeight1 - lineHeight2 > 0 && lineHeight2 > 0)
@@ -2068,7 +2069,7 @@ namespace hexin_csharp
         static public bool CheckTitlePage(Slide slide)
         {
             foreach (Shape shape in slide.Shapes)
-            { 
+            {
                 if (!Regex.IsMatch(shape.Name, @"^C_"))
                 {
                     return false;
@@ -3137,8 +3138,8 @@ namespace hexin_csharp
                 TextRange line = shape.TextFrame.TextRange.Lines(i);
                 prevCharCount = charCount;
                 charCount += line.Length;
-                if ((prevCharCount < l && charCount >= l) || 
-                    (prevCharCount < r && charCount > r) || 
+                if ((prevCharCount < l && charCount >= l) ||
+                    (prevCharCount < r && charCount > r) ||
                     (charCount > l && charCount <= r))
                 {
                     if (line.BoundHeight > avgLineHeight + e)
