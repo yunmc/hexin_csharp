@@ -90,9 +90,9 @@ namespace hexin_csharp
                     }
                 }
             }
-            for (int i = 1; i <= sortedShapes.Count - 1; i++)
+            for (int i = 0; i < sortedShapes.Count - 1; i++)
             {
-                for (int j = i + 1; j <= sortedShapes.Count; j++)
+                for (int j = i + 1; j < sortedShapes.Count; j++)
                 {
                     if (sortedShapes[i].Top > sortedShapes[j].Top)
                     {
@@ -234,7 +234,7 @@ namespace hexin_csharp
                 string ShapeNodeId = Match.Groups[3].Value;
                 string ShapeLabel = Match.Groups[4].Value;
                 string ShapeKey = ShapeType + ":" + ShapeNodeId;
-                string ShapeParentNodeId = "";
+                string ShapeParentNodeId = "-1";
                 RegExp = new Regex(@"parentnodeid=([\d\w]+)");
                 if (RegExp.IsMatch(shape.Name))
                 {
@@ -1591,6 +1591,10 @@ namespace hexin_csharp
                 return shape.Width;
             }
             double width = shape.TextFrame.TextRange.BoundWidth;
+            if (shape.TextFrame.TextRange.Lines().Count > 1)
+            {
+                return width;
+            }
             width += shape.TextFrame.MarginLeft;
             width += shape.TextFrame.MarginRight;
             if (shape.TextFrame.Ruler.Levels[1].FirstMargin > 1)
@@ -1699,10 +1703,7 @@ namespace hexin_csharp
             List<Shape> contentShapes = new List<Shape>();
             foreach (Shape shape in shapes)
             {
-                if (!CheckMatchPositionShape(shape))
-                {
-                    contentShapes.Add(shape);
-                }
+                contentShapes.Add(shape);
             }
             return ComputeLogicalNodeTop(contentShapes);
         }
@@ -1712,17 +1713,14 @@ namespace hexin_csharp
             double computeContentBottom = -1;
             foreach (Shape shape in shapes)
             {
-                if (!CheckMatchPositionShape(shape) || CheckHasImageTip(shape))
+                double height = shape.Height;
+                if (shape.HasTextFrame == MsoTriState.msoTrue)
                 {
-                    double height = shape.Height;
-                    if (shape.HasTextFrame == MsoTriState.msoTrue)
-                    {
-                        height = shape.TextFrame.TextRange.BoundHeight;
-                    }
-                    if (shape.Top + height > computeContentBottom)
-                    {
-                        computeContentBottom = shape.Top + height;
-                    }
+                    height = shape.TextFrame.TextRange.BoundHeight;
+                }
+                if (shape.Top + height > computeContentBottom)
+                {
+                    computeContentBottom = shape.Top + height;
                 }
             }
             return computeContentBottom;
@@ -1733,12 +1731,9 @@ namespace hexin_csharp
             double computeContentLeft = 9999;
             foreach (Shape shape in shapes)
             {
-                if (!CheckMatchPositionShape(shape) || CheckHasImageTip(shape))
+                if (shape.Left < computeContentLeft)
                 {
-                    if (shape.Left < computeContentLeft)
-                    {
-                        computeContentLeft = shape.Left;
-                    }
+                    computeContentLeft = shape.Left;
                 }
             }
             return computeContentLeft;
@@ -1749,12 +1744,9 @@ namespace hexin_csharp
             double computeContentRight = -1;
             foreach (Shape shape in shapes)
             {
-                if (!CheckMatchPositionShape(shape) || CheckHasImageTip(shape))
+                if (ComputeShapeRight(shape) > computeContentRight)
                 {
-                    if (ComputeShapeRight(shape) > computeContentRight)
-                    {
-                        computeContentRight = ComputeShapeRight(shape);
-                    }
+                    computeContentRight = ComputeShapeRight(shape);
                 }
             }
             return computeContentRight;
@@ -2070,7 +2062,7 @@ namespace hexin_csharp
         {
             foreach (Shape shape in slide.Shapes)
             {
-                if (!Regex.IsMatch(shape.Name, @"^C_"))
+                if (!Regex.IsMatch(shape.Name, @"^C"))
                 {
                     return false;
                 }
@@ -2269,7 +2261,7 @@ namespace hexin_csharp
         {
             foreach (Shape shape in slide.Shapes)
             {
-                if (!shape.Name.Substring(0, 2).Equals("C_"))
+                if (!shape.Name.Substring(0, 1).Equals("C"))
                 {
                     return false;
                 }
@@ -2548,16 +2540,18 @@ namespace hexin_csharp
             try
             {
                 string[] shapeInfo = GetShapeInfo(shape);
-                string shapeLabel = shapeInfo[1];
+                string shapeLabel = shapeInfo[2];
                 bool hasTableImageShape = shapeLabel == ".table_image";
                 bool hasFixed = shapeLabel == ".fixed";
                 bool hasInlineImage = CheckInlineImage(shape);
                 bool hasMatchAnswer = CheckMatchPositionAnswer(shape);
+                bool hasLongTextAnswer = shape.Name.Contains("haslongtextanswer");
                 return hasTableImageShape ||
                     hasFixed ||
                     hasInlineImage ||
                     hasMatchAnswer ||
-                    CheckHasImageTip(shape);
+                    CheckHasImageTip(shape) ||
+                    hasLongTextAnswer;
             }
             catch (Exception)
             {
@@ -2839,6 +2833,31 @@ namespace hexin_csharp
             }
             checkSlideImageTip = (image.Parent.SlideIndex == slide.SlideIndex);
             return checkSlideImageTip;
+        }
+
+        static public bool CheckSlideOverFlow(Slide slide)
+        {
+            int e = 50;
+            foreach (Shape shape in slide.Shapes)
+            {
+                if (shape.Top < -1)
+                {
+                    return true;
+                }
+                else if (shape.Left < -1)
+                {
+                    return true;
+                }
+                else if (ComputeShapeRight(shape) > Global.slideWidth + e)
+                {
+                    return true;
+                }
+                else if (ComputeShapeBottom(shape) > Global.slideHeight + e)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // @description 判断单元格是否是合并单元格

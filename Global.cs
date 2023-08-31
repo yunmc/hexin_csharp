@@ -7,7 +7,7 @@ namespace hexin_csharp
     public class Global
     {
         static public Dictionary<string, bool> GlobalMergedCellMap = new Dictionary<string, bool>();
-        static public Dictionary<string, Shape[]> GlobalParentNodeMap = new Dictionary<string, Shape[]>();
+        static public Dictionary<string, List<Shape>> GlobalParentNodeMap = new Dictionary<string, List<Shape>>();
         static public Dictionary<string, Shape[]> GlobalImageTipMap = new Dictionary<string, Shape[]>();
         static public Dictionary<string, Shape> GlobalInlineImageMap = new Dictionary<string, Shape>();
         static public Dictionary<string, Shape> GlobalTableImageMap = new Dictionary<string, Shape>();
@@ -43,5 +43,6 @@ namespace hexin_csharp
         static public string pptProjectId = "-1";
         static public string pptTaskId = "-1";
         static public string pptSubject = "-1";
+        static public string pptSourceFrom = "-1";
     }
 }
