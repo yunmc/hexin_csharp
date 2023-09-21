@@ -53,14 +53,14 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\Administrator\\Downloads\\26dd150b197348658b66.pptx";
+                pptxPath = "C:\\Users\\Administrator\\Downloads\\57630e7d9c6441eea6dd.pptx";
                 pptxSaveAsPath = "C:\\Users\\Administrator\\Downloads\\1（1）.pptx";
                 pptxImageSavAsPath = "C:\\hexin\\vstopptximages";
             }
 
             if (!File.Exists(pptxPath))
             {
-                Tester.Log("-1001：pptx 文件不存在，直接退出");
+                Tester.Log("-1001：pptx 文件不存在，直接退出#P00");
                 return;
             }
 
@@ -88,7 +88,7 @@ namespace hexin_csharp
                 }
                 catch
                 {
-                    Tester.Log("-1002：系统运行异常");
+                    Tester.Log("-1002：系统运行异常#P00");
                 }
             }
 
@@ -157,11 +157,6 @@ namespace hexin_csharp
             }
         }
 
-        static public int Scoring()
-        {
-            return -1; // @todo：跑通流程，具体打分策略待补充
-        }
-
         static public void ConfuseInformation()
         {
             foreach (Slide slide in Global.app.ActivePresentation.Slides)
@@ -182,6 +177,11 @@ namespace hexin_csharp
                     }
                 }
             }
+        }
+
+        static public int Scoring()
+        {
+            return -1; // @todo：跑通流程，具体打分策略待补充
         }
     }
 
@@ -204,13 +204,15 @@ namespace hexin_csharp
         // -31xx：分页问题
         // -3101：页面不能太空
         // -3102：页面不能存在单行一页的情况
-        // -3102：疑似选择题选项部分被分页
+        // -3103：疑似选择题选项部分被分页
 
         // -32xx：元素问题
         // -3201：题干中间存在非题干的部分
         // -3202：内容存在重叠
         // -3203：疑似答案回填异常
         // -3204：疑似材料识别异常
+        // -3205：试题上面不能有其他被分割的试题节点
+        // -3206：若当前试题被分割，则上面不能有其他非父试题节点
 
         // -33xx：行问题
         // -3301：标点符号不能在行首
@@ -218,6 +220,8 @@ namespace hexin_csharp
         // -3303：疑似标题识别异常
         // -3304：左括号不能单独在行末
         // -3305：标题不能在页末
+
+        // -4xxx：docx_html 机器质检问题
 
         public static void Test()
         {
@@ -422,7 +426,7 @@ namespace hexin_csharp
                 }
                 if (!canipass)
                 {
-                    Log("-3101：" + slide.SlideIndex + "#页面不能太空");
+                    Log("-3101#" + slide.SlideIndex + "#页面不能太空#P00");
                 }
             }
             if (!isTitlePage &&
@@ -467,14 +471,14 @@ namespace hexin_csharp
                         }
                         if (!canipass)
                         {
-                            Log("-3102：" + slide.SlideIndex + "#页面不能存在单行一页的情况");
+                            Log("-3102#" + slide.SlideIndex + "#页面不能存在单行一页的情况#P00");
                         }
                     }
                 }
             }
             if (Utils.CheckSlideOverFlow(slide))
             {
-                Log("-3001：" + slide.SlideIndex + "#内容存在溢出");
+                Log("-3001#" + slide.SlideIndex + "#内容存在溢出#P0");
             }
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             for (int i = 1; i < shapes.Count - 1; i++)
@@ -494,7 +498,7 @@ namespace hexin_csharp
                     !shapes[i - 1].Name.Contains("hastextimagelayout") &&
                     !shapes[i + 1].Name.Contains("hastextimagelayout")) // 过滤掉横向布局的情况
                 {
-                    Log("-3201：" + slide.SlideIndex + "#题干中间存在非题干的部分");
+                    Log("-3201#" + slide.SlideIndex + "#题干中间存在非题干的部分#P00");
                 }
             }
         }
@@ -504,13 +508,76 @@ namespace hexin_csharp
             Slide slide = containerShape.Parent;
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
+            // @tips：
+            // docx_html 环节的机器质检信息。
+            // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
+            if (Regex.IsMatch(containerShape.Name, @"aifcode=(-?[\d]+)"))
+            {
+                string aifCode = Regex.Match(containerShape.Name, @"aifcode=(-?[\d]+)").Groups[1].Value;
+                if (aifCode == "-1")
+                {
+                    // 无事发生。。。
+                }
+                else if (aifCode == "101")
+                {
+                    Log("-4101#" + slide.SlideIndex + "#上下标异常#P0");
+                }
+                else if (aifCode == "102")
+                {
+                    Log("-4102#" + slide.SlideIndex + "#题号位置问题#P0");
+                }
+                else if (aifCode == "103")
+                {
+                    Log("-4103#" + slide.SlideIndex + "#表格拆分异常#P00");
+                }
+                else if (aifCode == "104")
+                {
+                    Log("-4104#" + slide.SlideIndex + "#答案拆分异常#P00");
+                }
+                else if (aifCode == "105")
+                {
+                    Log("-4105#" + slide.SlideIndex + "#试题答案拆分异常#P0");
+                }
+                else if (aifCode == "1061")
+                {
+                    Log("-41061#" + slide.SlideIndex + "#讲解类试题选择题答案回插异常#P00");
+                }
+                else if (aifCode == "1062")
+                {
+                    Log("-41062#" + slide.SlideIndex + "#讲解类试题填空题答案回插异常#P00");
+                }
+                else if (aifCode == "1063")
+                {
+                    Log("-41063#" + slide.SlideIndex + "#讲解类试题解答题答案回插异常#P00");
+                }
+                else if (aifCode == "107")
+                {
+                    Log("-4107#" + slide.SlideIndex + "#选项多行问题#P0");
+                }
+                else if (aifCode == "108")
+                {
+                    Log("-4108#" + slide.SlideIndex + "#公式问题#P0");
+                }
+                else if (aifCode == "109")
+                {
+                    Log("-4109#" + slide.SlideIndex + "#异常加粗问题#P1");
+                }
+                else if (aifCode == "110")
+                {
+                    Log("-4110#" + slide.SlideIndex + "#材料题识别异常#P1");
+                }
+                else if (aifCode == "111")
+                {
+                    Log("-4111#" + slide.SlideIndex + "#答案解析未拆分问题#P0");
+                }
+            }
             if (!Utils.CheckMatchPositionShape(containerShape) &&
                 containerShape.HasTextFrame == MsoTriState.msoTrue &&
                 shapeIndex == 0)
             {
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"^[BCD]\."))
                 {
-                    Log("-3102：" + slide.SlideIndex + "#疑似选择题选项部分被分页");
+                    Log("-3103#" + slide.SlideIndex + "#疑似选择题选项部分被分页#P00");
                 }
             }
             if (!Utils.CheckMatchPositionShape(containerShape) &&
@@ -520,36 +587,36 @@ namespace hexin_csharp
                 if (containerShape.Name.StartsWith("Q") &&
                     Regex.IsMatch(shape.TextFrame.TextRange.Text, @"^【.*?】[ABCDEFG]\s*$"))
                 {
-                    Log("-3203：" + slide.SlideIndex + "#疑似答案回填异常");
+                    Log("-3203#" + slide.SlideIndex + "#疑似答案回填异常#P00");
                 }
             }
             if (containerShape.HasTextFrame == MsoTriState.msoTrue)
             {
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"■"))
                 {
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的字符“■”");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的字符“■”#P00");
                 }
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"$[^$]+$"))
                 {
                     string mark = Regex.Match(shape.TextFrame.TextRange.Text, @"$[^$]+$").Value;
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的标记");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的标记#P00");
                 }
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"HXDOLLAR"))
                 {
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的标记");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的标记#P00");
                 }
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"\\\s?[a-zA-Z𝑎𝑏𝑐𝑑𝑒𝑓𝑔𝑖𝑗𝑘𝑙𝑚𝑛𝑜𝑝𝑞𝑟𝑠𝑡𝑢𝑣𝑤𝑥𝑦𝑧]+"))
                 {
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的标记");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的标记#P00");
                 }
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"&[a-zA-Z𝑎𝑏𝑐𝑑𝑒𝑓𝑔𝑖𝑗𝑘𝑙𝑚𝑛𝑜𝑝𝑞𝑟𝑠𝑡𝑢𝑣𝑤𝑥𝑦𝑧]+;"))
                 {
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的标记");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的标记#P00");
                 }
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"\$\$") ||
                     Regex.IsMatch(shape.TextFrame.TextRange.Text, @"(\{\{)|(\}\})"))
                 {
-                    Log("-2001：" + slide.SlideIndex + "#存在异常的标记");
+                    Log("-2001#" + slide.SlideIndex + "#存在异常的标记#P00");
                 }
             }
             if (shapeIndex >= 0 &&
@@ -560,7 +627,7 @@ namespace hexin_csharp
             {
                 if (Regex.IsMatch(shape.TextFrame.TextRange.Text, @"(回答|完成).*?(([\d\、]+)|(\d+\-\d+))小?题"))
                 {
-                    Log("-3204：" + slide.SlideIndex + "#疑似材料识别异常");
+                    Log("-3204#" + slide.SlideIndex + "#疑似材料识别异常#P00");
                 }
             }
             // @todo：下面的逻辑性能不太好，可以去掉。
@@ -576,22 +643,64 @@ namespace hexin_csharp
                         !Utils.CheckHasDiffside(containerShape, otherShape) &&
                         Utils.CheckStrictOverShapes(containerShape, otherShape, e))
                     {
-                        Log("-3202：" + slide.SlideIndex + "#内容存在重叠");
+                        Log("-3202#" + slide.SlideIndex + "#内容存在重叠#P00");
                     }
                     if (containerShape.Id != otherShape.Id &&
                         containerShape.Type == MsoShapeType.msoPicture &&
                         otherShape.Type == MsoShapeType.msoPicture &&
                         Utils.CheckStrictOverShapes(containerShape, otherShape, e))
                     {
-                        Log("-3202：" + slide.SlideIndex + "#内容存在重叠");
+                        Log("-3202#" + slide.SlideIndex + "#内容存在重叠#P00");
                     }
                     if (containerShape.Id != otherShape.Id &&
                        Utils.CheckMatchPositionShape(containerShape) &&
                        Utils.CheckMatchPositionShape(otherShape) &&
                        Utils.CheckStrictOverShapes(containerShape, otherShape, e))
                     {
-                        Log("-3202：" + slide.SlideIndex + "#内容存在重叠");
+                        Log("-3202#" + slide.SlideIndex + "#内容存在重叠#P00");
                     }
+                }
+            }
+            if (containerShape.Name.StartsWith("Q") &&
+                Utils.GetShapeInfo(containerShape)[6] == "BD" &&
+                shapeIndex > 0)
+            {
+                Shape prevLastShape = null;
+                Shape nextFirstShape = null;
+                Shape currentFirstShape = shapes[0];
+                if (slide.SlideIndex > 1)
+                {
+                    Slide prevSlide = Global.app.ActivePresentation.Slides[slide.SlideIndex - 1];
+                    if (prevSlide.Shapes.Count > 0)
+                    {
+                        List<Shape> prevShapes = Utils.GetSortedSlideShapes(prevSlide);
+                        prevLastShape = prevShapes[prevShapes.Count - 1];
+                    }
+                }
+                if (slide.SlideIndex < Global.app.ActivePresentation.Slides.Count)
+                {
+                    Slide nextSlide = Global.app.ActivePresentation.Slides[slide.SlideIndex + 1];
+                    if (nextSlide.Shapes.Count > 0)
+                    {
+                        List<Shape> nextShapes = Utils.GetSortedSlideShapes(nextSlide);
+                        nextFirstShape = nextShapes[0];
+                    }
+                }
+                if (prevLastShape != null &&
+                    Utils.GetShapeInfo(prevLastShape)[0] == Utils.GetShapeInfo(currentFirstShape)[0] &&
+                    Utils.GetShapeInfo(currentFirstShape)[0] != Utils.GetShapeInfo(containerShape)[0] &&
+                    currentFirstShape.Name.StartsWith("Q"))
+                {
+                    Log("-3205#" + slide.SlideIndex + "#试题上面不能有其他被分割的试题节点#P00");
+                }
+                if (nextFirstShape != null &&
+                    Utils.GetShapeInfo(containerShape)[0] == Utils.GetShapeInfo(nextFirstShape)[0] &&
+                    Utils.GetShapeInfo(containerShape)[6] == "BD" &&
+                    shapes[shapeIndex - 1].Name.StartsWith("Q") &&
+                    Utils.GetShapeInfo(containerShape)[0] != Utils.GetShapeInfo(shapes[shapeIndex - 1])[0] &&
+                    Utils.GetShapeInfo(containerShape)[4] != Utils.GetShapeInfo(shapes[shapeIndex - 1])[0])
+                {
+                    Log("-3206#" + slide.SlideIndex + "#若当前试题被分割，则上面不能有其他非父试题节点#P00");
                 }
             }
         }
@@ -610,7 +719,7 @@ namespace hexin_csharp
             }
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
-            // - @todo：表格里单列文字的情况忽略
+            // - @disabled：单字成行的问题目前可以忽略，不反馈给用户。@todo：表格里单列文字的情况忽略
             if (line.Length > 1 &&
                 !Regex.IsMatch(line.Text, @"(^\.%\d+%)|(^\.&\d+&)") &&
                 !Regex.IsMatch(line.Text, @"^...") &&
@@ -619,14 +728,14 @@ namespace hexin_csharp
                 !Regex.IsMatch(line.Text, @"^\)。") &&
                 Regex.IsMatch(line.Text, @"^\s*[!),.:;?\]、。—ˇ¨〃々～‖…’”〕〉》」』〗】∶！＇），．：；？］｀｜｝]"))
             {
-                Log("-3301：" + slide.SlideIndex + "#标点符号不能在行首");
+                Log("-3301#" + slide.SlideIndex + "#标点符号不能在行首#P0");
             }
-            if (!Utils.CheckMatchPositionShape(containerShape) &&
-                shape.TextFrame.TextRange.Lines().Count > 1 &&
-                line.Length == 1)
-            {
-                Log("-3302：" + slide.SlideIndex + "#单字成行");
-            }
+            //if (!Utils.CheckMatchPositionShape(containerShape) &&
+            //    shape.TextFrame.TextRange.Lines().Count > 1 &&
+            //    line.Length == 1)
+            //{
+            //    Log("-3302#" + slide.SlideIndex + "#单字成行#P1");
+            //}
             if (Global.pptSourceFrom == "W2PPT" &&
                 containerShape.HasTextFrame == MsoTriState.msoTrue &&
                 lineIndex == shape.TextFrame.TextRange.Lines().Count &&
@@ -716,12 +825,12 @@ namespace hexin_csharp
                 }
                 if (iserror && !canipass)
                 {
-                    Log("-3303：" + slide.SlideIndex + "#疑似标题识别异常");
+                    Log("-3303#" + slide.SlideIndex + "#疑似标题识别异常#P00");
                 }
             }
             if (Regex.IsMatch(line.Text, @"[\(\（]\s*$"))
             { // 左括号单独成行
-                Log("-3304：" + slide.SlideIndex + "#左括号不能单独在行末");
+                Log("-3304#" + slide.SlideIndex + "#左括号不能单独在行末#P1");
             }
             if (containerShape.HasTextFrame == MsoTriState.msoTrue &&
                 shape.TextFrame.TextRange.Lines().Count == lineIndex &&
@@ -805,7 +914,7 @@ namespace hexin_csharp
                 }
                 if (iserror && !canipass)
                 {
-                    Log("-3305：" + slide.SlideIndex + "#标题不能在页末");
+                    Log("-3305#" + slide.SlideIndex + "#标题不能在页末#P00");
                 }
             }
         }
