@@ -220,6 +220,9 @@ namespace hexin_csharp
         // -3303：疑似标题识别异常
         // -3304：左括号不能单独在行末
         // -3305：标题不能在页末
+        
+        // -34xx：选项布局问题
+        // -3401: 选项布局异常
 
         // -4xxx：docx_html 机器质检问题
 
@@ -508,6 +511,46 @@ namespace hexin_csharp
             Slide slide = containerShape.Parent;
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
+            List<int> optionCountsPerLine = new List<int>();
+            Regex regex = new Regex(@"[A-D]\..+?(\s|$)");
+
+            if (shape.HasTextFrame == Microsoft.Office.Core.MsoTriState.msoTrue)
+            {
+                Microsoft.Office.Interop.PowerPoint.TextFrame textFrame = shape.TextFrame;
+                if (textFrame.HasText == Microsoft.Office.Core.MsoTriState.msoTrue && regex.IsMatch(shape.TextFrame.TextRange.Text))
+                {
+                    TextRange textRange = textFrame.TextRange;
+                    int totalOptionsCount = 0;
+
+                    for (int i = 1; i <= textRange.Paragraphs().Count; i++)
+                    {
+                        try
+                        {
+                            string paragraphText = textRange.Paragraphs(i).Text;
+                            MatchCollection matches = regex.Matches(paragraphText);
+                            if(regex.IsMatch(paragraphText))
+                            { 
+                                // 收集每一行的选项数量
+                                //Log(regex.IsMatch(paragraphText)? "true" : "false");
+                                /*Log(paragraphText);
+                                Log($"第{i}行有 {matches.Count} 个选项");*/
+                                totalOptionsCount += matches.Count;
+                                optionCountsPerLine.Add(matches.Count);
+                            }
+                        }
+                        catch (ArgumentException)
+                        {
+                            Log( "第" + slide.SlideIndex + "页: " + "无法获取第 " + i + " 段的文本");
+                        }
+                    }
+                    if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]))
+                    {
+                        Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
+                    }
+                    
+                }
+            }
+            
             // @tips：
             // docx_html 环节的机器质检信息。
             // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
