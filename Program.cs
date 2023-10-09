@@ -224,9 +224,6 @@ namespace hexin_csharp
         // -34xx：布局问题
         // -3401: 选项布局异常
         
-        // -35xx: 内容问题
-        // -3501: 疑似标题识别异常（“考向”
-
         // -4xxx：docx_html 机器质检问题
 
         public static void Test()
