@@ -41,7 +41,7 @@ namespace hexin_csharp
         {
             // 详细阅读文档：https://sigmaai.feishu.cn/docs/doccncPV9QaIVlcDYRHs6nEpl8e#ZHEaGa
 
-            bool DEBUG = false;
+            bool DEBUG = true;
 
             string pptxPath, pptxSaveAsPath, pptxImageSavAsPath;
 
@@ -53,7 +53,7 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\17146\\Desktop\\pptx\\集合（学生版）.docx4655e.pptx";
+                pptxPath = "C:\\Users\\17146\\Desktop\\pptx\\集合（学生版）.docx4655e - 副本.pptx";
                 pptxSaveAsPath = "C:\\Users\\17146\\Desktop\\pptx\\1（1）.pptx";
                 pptxImageSavAsPath = "C:\\Users\\17146\\Desktop\\pptx\\vstopptximages";
             }
@@ -511,39 +511,60 @@ namespace hexin_csharp
             Slide slide = containerShape.Parent;
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
-            List<int> optionCountsPerLine = new List<int>();
-            // 创建一个字号集合，用于存储不一致的字号
-            HashSet<float> fontSizes = new HashSet<float>();
-            
-            Regex regex = new Regex(@"[A-Z]\.\w+");
             
             // 检查选项布局和标题异常
-            if (shape.HasTextFrame == MsoTriState.msoTrue )
+            if (shape.HasTextFrame == MsoTriState.msoTrue && shape.Name.StartsWith("QC") && !shape.Name.Contains("AN") && !shape.Name.Contains("AS") )
             {
+                    List<int> optionCountsPerLine = new List<int>();
+                    Regex regexA = new Regex(@"A\..*");
+                    Regex regexB = new Regex(@"B\..*");
+                    Regex regexC = new Regex(@"C\..*");
+                    Regex regexD = new Regex(@"D\..*");
                     TextRange textRange = shape.TextFrame.TextRange;
                     // string bodyType = 
                     int totalOptionsCount = 0;
-                    // 用于标记是否在公式文本段中
+                    // 收集每一行的选项数量
                     for (int i = 1; i <= textRange.Lines().Count; i++)
                     {
                         try
                         {
                             string lineText = textRange.Lines(i).Text;
-                            MatchCollection matches = regex.Matches(lineText);
-                            if(regex.IsMatch(lineText))
+                            MatchCollection matchA = regexA.Matches(lineText);
+                            MatchCollection matchB = regexB.Matches(lineText);
+                            MatchCollection matchC = regexC.Matches(lineText);
+                            MatchCollection matchD = regexD.Matches(lineText);
+                            if(regexA.IsMatch(lineText))
+                            { 
+                                totalOptionsCount += matchA.Count;
+                            }
+                            if(regexB.IsMatch(lineText) )
+                            { 
+                                totalOptionsCount += matchB.Count;
+                            }
+                            if(regexC.IsMatch(lineText))
+                            { 
+                                totalOptionsCount += matchC.Count;
+                            }
+                            if(regexD.IsMatch(lineText))
                             { 
                                 // 收集每一行的选项数量
-                                totalOptionsCount += matches.Count;
-                                optionCountsPerLine.Add(matches.Count);
+                                totalOptionsCount += matchD.Count;
                             }
+                            optionCountsPerLine.Add(totalOptionsCount);
+                            totalOptionsCount = 0;
                         }
                         catch (ArgumentException)
                         {
                             // Log( "无法获取第" + slide.SlideIndex + "页: " + "第 " + i + " 段的文本");
                         }
                     }
+                    int total = 0;
+                    foreach (var lineCount in optionCountsPerLine)
+                    {
+                        total += lineCount;
+                    }
                     // 只有是 QC 并且不是 AN AS
-                    if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]) && shape.Name.StartsWith("QC") && !shape.Name.Contains("AN") && !shape.Name.Contains("AS") )
+                    if (total == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]))
                     {
                         Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
                     }
