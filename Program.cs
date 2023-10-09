@@ -41,7 +41,7 @@ namespace hexin_csharp
         {
             // 详细阅读文档：https://sigmaai.feishu.cn/docs/doccncPV9QaIVlcDYRHs6nEpl8e#ZHEaGa
 
-            bool DEBUG = false;
+            bool DEBUG = true;
 
             string pptxPath, pptxSaveAsPath, pptxImageSavAsPath;
 
@@ -53,9 +53,9 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\Administrator\\Downloads\\57630e7d9c6441eea6dd.pptx";
-                pptxSaveAsPath = "C:\\Users\\Administrator\\Downloads\\1（1）.pptx";
-                pptxImageSavAsPath = "C:\\hexin\\vstopptximages";
+                pptxPath = "C:\\Users\\17146\\Desktop\\pptx\\集合（学生版）.docx4655e.pptx";
+                pptxSaveAsPath = "C:\\Users\\17146\\Desktop\\pptx\\1（1）.pptx";
+                pptxImageSavAsPath = "C:\\Users\\17146\\Desktop\\pptx\\vstopptximages";
             }
 
             if (!File.Exists(pptxPath))
@@ -221,8 +221,11 @@ namespace hexin_csharp
         // -3304：左括号不能单独在行末
         // -3305：标题不能在页末
         
-        // -34xx：选项布局问题
+        // -34xx：布局问题
         // -3401: 选项布局异常
+        
+        // -35xx: 内容问题
+        // -3501: 疑似标题识别异常（“考向”
 
         // -4xxx：docx_html 机器质检问题
 
@@ -512,43 +515,41 @@ namespace hexin_csharp
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
             List<int> optionCountsPerLine = new List<int>();
-            Regex regex = new Regex(@"[A-D]\..+?(\s|$)");
-
-            if (shape.HasTextFrame == Microsoft.Office.Core.MsoTriState.msoTrue)
+            // 创建一个字号集合，用于存储不一致的字号
+            HashSet<float> fontSizes = new HashSet<float>();
+            
+            Regex regex = new Regex(@"[A-Z]\.\w+");
+            
+            // Log(containerShape.Name);
+            // 检查选项布局和标题异常
+            if (shape.HasTextFrame == MsoTriState.msoTrue)
             {
-                Microsoft.Office.Interop.PowerPoint.TextFrame textFrame = shape.TextFrame;
-                if (textFrame.HasText == Microsoft.Office.Core.MsoTriState.msoTrue && regex.IsMatch(shape.TextFrame.TextRange.Text))
-                {
-                    TextRange textRange = textFrame.TextRange;
+                    TextRange textRange = shape.TextFrame.TextRange;
                     int totalOptionsCount = 0;
-
+                    // 用于标记是否在公式文本段中
                     for (int i = 1; i <= textRange.Paragraphs().Count; i++)
                     {
                         try
                         {
-                            string paragraphText = textRange.Paragraphs(i).Text;
-                            MatchCollection matches = regex.Matches(paragraphText);
-                            if(regex.IsMatch(paragraphText))
+                            string lineText = textRange.Lines(i).Text;
+                            MatchCollection matches = regex.Matches(lineText);
+                            
+                            if(regex.IsMatch(lineText))
                             { 
                                 // 收集每一行的选项数量
-                                //Log(regex.IsMatch(paragraphText)? "true" : "false");
-                                /*Log(paragraphText);
-                                Log($"第{i}行有 {matches.Count} 个选项");*/
                                 totalOptionsCount += matches.Count;
                                 optionCountsPerLine.Add(matches.Count);
                             }
                         }
                         catch (ArgumentException)
                         {
-                            Log( "第" + slide.SlideIndex + "页: " + "无法获取第 " + i + " 段的文本");
+                            // Log( "无法获取第" + slide.SlideIndex + "页: " + "第 " + i + " 段的文本");
                         }
                     }
                     if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]))
                     {
                         Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
                     }
-                    
-                }
             }
             
             // @tips：
