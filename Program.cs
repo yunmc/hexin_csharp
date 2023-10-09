@@ -41,7 +41,7 @@ namespace hexin_csharp
         {
             // 详细阅读文档：https://sigmaai.feishu.cn/docs/doccncPV9QaIVlcDYRHs6nEpl8e#ZHEaGa
 
-            bool DEBUG = true;
+            bool DEBUG = false;
 
             string pptxPath, pptxSaveAsPath, pptxImageSavAsPath;
 
