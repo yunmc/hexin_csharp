@@ -520,20 +520,19 @@ namespace hexin_csharp
             
             Regex regex = new Regex(@"[A-Z]\.\w+");
             
-            // Log(containerShape.Name);
             // 检查选项布局和标题异常
-            if (shape.HasTextFrame == MsoTriState.msoTrue)
+            if (shape.HasTextFrame == MsoTriState.msoTrue )
             {
                     TextRange textRange = shape.TextFrame.TextRange;
+                    // string bodyType = 
                     int totalOptionsCount = 0;
                     // 用于标记是否在公式文本段中
-                    for (int i = 1; i <= textRange.Paragraphs().Count; i++)
+                    for (int i = 1; i <= textRange.Lines().Count; i++)
                     {
                         try
                         {
                             string lineText = textRange.Lines(i).Text;
                             MatchCollection matches = regex.Matches(lineText);
-                            
                             if(regex.IsMatch(lineText))
                             { 
                                 // 收集每一行的选项数量
@@ -546,12 +545,12 @@ namespace hexin_csharp
                             // Log( "无法获取第" + slide.SlideIndex + "页: " + "第 " + i + " 段的文本");
                         }
                     }
-                    if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]))
+                    // 只有是 QC 并且不是 AN AS
+                    if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]) && shape.Name.StartsWith("QC") && !shape.Name.Contains("AN") && !shape.Name.Contains("AS") )
                     {
                         Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
                     }
             }
-            
             // @tips：
             // docx_html 环节的机器质检信息。
             // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
