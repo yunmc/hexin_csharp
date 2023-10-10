@@ -524,7 +524,6 @@ namespace hexin_csharp
                     Regex regexC = new Regex(@"C\..*");
                     Regex regexD = new Regex(@"D\..*");
                     TextRange textRange = shape.TextFrame.TextRange;
-                    // string bodyType = 
                     int totalOptionsCount = 0;
                     // 收集每一行的选项数量
                     for (int i = 1; i <= textRange.Lines().Count; i++)
