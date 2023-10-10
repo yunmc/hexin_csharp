@@ -512,8 +512,11 @@ namespace hexin_csharp
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
             
-            // 检查选项布局和标题异常
-            if (shape.HasTextFrame == MsoTriState.msoTrue && shape.Name.StartsWith("QC") && !shape.Name.Contains("AN") && !shape.Name.Contains("AS") )
+            // 检查选项布局和标题异常, 只有是 QC 并且不是 AN AS
+            if (shape.HasTextFrame == MsoTriState.msoTrue && 
+                shape.Name.StartsWith("QC") && 
+                !shape.Name.Contains("AN") &&
+                !shape.Name.Contains("AS") )
             {
                     List<int> optionCountsPerLine = new List<int>();
                     Regex regexA = new Regex(@"A\..*");
@@ -561,10 +564,12 @@ namespace hexin_csharp
                     int total = 0;
                     foreach (var lineCount in optionCountsPerLine)
                     {
+                        // 获取当前shape的总的选项个数
                         total += lineCount;
                     }
-                    // 只有是 QC 并且不是 AN AS
-                    if (total == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]))
+                    if (total == 4 && 
+                        !optionCountsPerLine.Contains(4) && 
+                        optionCountsPerLine.Any(count => count != optionCountsPerLine[0]))
                     {
                         Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
                     }
