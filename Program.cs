@@ -53,7 +53,7 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\Administrator\\Downloads\\57630e7d9c6441eea6dd.pptx";
+                pptxPath = "C:\\Users\\Administrator\\Downloads\\26dd150b197348658b66.pptx";
                 pptxSaveAsPath = "C:\\Users\\Administrator\\Downloads\\1（1）.pptx";
                 pptxImageSavAsPath = "C:\\hexin\\vstopptximages";
             }
@@ -220,7 +220,10 @@ namespace hexin_csharp
         // -3303：疑似标题识别异常
         // -3304：左括号不能单独在行末
         // -3305：标题不能在页末
-
+        
+        // -34xx：布局问题
+        // -3401: 选项布局异常
+        
         // -4xxx：docx_html 机器质检问题
 
         public static void Test()
@@ -508,6 +511,79 @@ namespace hexin_csharp
             Slide slide = containerShape.Parent;
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
+            
+            // 检查选项布局和标题异常, 只有是 QC 并且不是 AN AS
+            if (shape.HasTextFrame == MsoTriState.msoTrue && 
+                shape.Name.StartsWith("QC") && 
+                !shape.Name.Contains("AN") &&
+                !shape.Name.Contains("EX") &&
+                !shape.Name.Contains("AS") )
+            {
+                    List<int> optionCountsPerLine = new List<int>();
+                    Regex regexA = new Regex(@"A\..*");
+                    Regex regexB = new Regex(@"B\..*");
+                    Regex regexC = new Regex(@"C\..*");
+                    Regex regexD = new Regex(@"D\..*");
+                    Regex regexE = new Regex(@"E\..*");
+                    TextRange textRange = shape.TextFrame.TextRange;
+                    int perOptionsCount = 0;
+                    bool hasEOption = false;
+                    // 收集每一行的选项数量
+                    for (int i = 1; i <= textRange.Lines().Count; i++)
+                    {
+                        try
+                        {
+                            string lineText = textRange.Lines(i).Text;
+                            Regex choiceRegex = new Regex(@"[A-D]\..*");
+                            MatchCollection matchA = regexA.Matches(lineText);
+                            MatchCollection matchB = regexB.Matches(lineText);
+                            MatchCollection matchC = regexC.Matches(lineText);
+                            MatchCollection matchD = regexD.Matches(lineText);
+                            if (regexE.IsMatch(lineText))
+                            {
+                                hasEOption = true;
+                            }
+                            if (choiceRegex.IsMatch(lineText)) // 先判断这是个选项 
+                            {
+                                if(regexA.IsMatch(lineText))
+                                { 
+                                    perOptionsCount += matchA.Count;
+                                }
+                                if(regexB.IsMatch(lineText) )
+                                { 
+                                    perOptionsCount += matchB.Count;
+                                }
+                                if(regexC.IsMatch(lineText))
+                                { 
+                                    perOptionsCount += matchC.Count;
+                                }
+                                if(regexD.IsMatch(lineText))
+                                { 
+                                    // 收集每一行的选项数量
+                                    perOptionsCount += matchD.Count;
+                                }
+                                optionCountsPerLine.Add(perOptionsCount);
+                                perOptionsCount = 0;
+                            }
+                        }
+                        catch (ArgumentException)
+                        {
+                        }
+                    }
+                    int total = 0;
+                    foreach (var lineCount in optionCountsPerLine)
+                    {
+                        // 获取当前shape的总的选项个数
+                        total += lineCount;
+                    }
+                    if (total == 4 && 
+                        !hasEOption &&
+                        !optionCountsPerLine.Contains(4) && 
+                        optionCountsPerLine.Any(count => count != optionCountsPerLine[0]))
+                    {
+                        Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
+                    }
+            }
             // @tips：
             // docx_html 环节的机器质检信息。
             // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
