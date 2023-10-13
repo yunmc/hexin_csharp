@@ -53,9 +53,9 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\17146\\Desktop\\pptx\\集合（学生版）.docx4655e - 副本.pptx";
-                pptxSaveAsPath = "C:\\Users\\17146\\Desktop\\pptx\\1（1）.pptx";
-                pptxImageSavAsPath = "C:\\Users\\17146\\Desktop\\pptx\\vstopptximages";
+                pptxPath = "C:\\Users\\Administrator\\Downloads\\26dd150b197348658b66.pptx";
+                pptxSaveAsPath = "C:\\Users\\Administrator\\Downloads\\1（1）.pptx";
+                pptxImageSavAsPath = "C:\\hexin\\vstopptximages";
             }
 
             if (!File.Exists(pptxPath))
@@ -516,6 +516,7 @@ namespace hexin_csharp
             if (shape.HasTextFrame == MsoTriState.msoTrue && 
                 shape.Name.StartsWith("QC") && 
                 !shape.Name.Contains("AN") &&
+                !shape.Name.Contains("EX") &&
                 !shape.Name.Contains("AS") )
             {
                     List<int> optionCountsPerLine = new List<int>();
@@ -524,40 +525,43 @@ namespace hexin_csharp
                     Regex regexC = new Regex(@"C\..*");
                     Regex regexD = new Regex(@"D\..*");
                     TextRange textRange = shape.TextFrame.TextRange;
-                    int totalOptionsCount = 0;
+                    int perOptionsCount = 0;
                     // 收集每一行的选项数量
                     for (int i = 1; i <= textRange.Lines().Count; i++)
                     {
                         try
                         {
                             string lineText = textRange.Lines(i).Text;
+                            Regex choiceRegex = new Regex(@"[A-D]\..*");
                             MatchCollection matchA = regexA.Matches(lineText);
                             MatchCollection matchB = regexB.Matches(lineText);
                             MatchCollection matchC = regexC.Matches(lineText);
                             MatchCollection matchD = regexD.Matches(lineText);
-                            if(regexA.IsMatch(lineText))
-                            { 
-                                totalOptionsCount += matchA.Count;
+                            if (choiceRegex.IsMatch(lineText)) // 先判断这是个选项 
+                            {
+                                if(regexA.IsMatch(lineText))
+                                { 
+                                    perOptionsCount += matchA.Count;
+                                }
+                                if(regexB.IsMatch(lineText) )
+                                { 
+                                    perOptionsCount += matchB.Count;
+                                }
+                                if(regexC.IsMatch(lineText))
+                                { 
+                                    perOptionsCount += matchC.Count;
+                                }
+                                if(regexD.IsMatch(lineText))
+                                { 
+                                    // 收集每一行的选项数量
+                                    perOptionsCount += matchD.Count;
+                                }
+                                optionCountsPerLine.Add(perOptionsCount);
+                                perOptionsCount = 0;
                             }
-                            if(regexB.IsMatch(lineText) )
-                            { 
-                                totalOptionsCount += matchB.Count;
-                            }
-                            if(regexC.IsMatch(lineText))
-                            { 
-                                totalOptionsCount += matchC.Count;
-                            }
-                            if(regexD.IsMatch(lineText))
-                            { 
-                                // 收集每一行的选项数量
-                                totalOptionsCount += matchD.Count;
-                            }
-                            optionCountsPerLine.Add(totalOptionsCount);
-                            totalOptionsCount = 0;
                         }
                         catch (ArgumentException)
                         {
-                            // Log( "无法获取第" + slide.SlideIndex + "页: " + "第 " + i + " 段的文本");
                         }
                     }
                     int total = 0;
