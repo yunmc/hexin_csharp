@@ -524,8 +524,10 @@ namespace hexin_csharp
                     Regex regexB = new Regex(@"B\..*");
                     Regex regexC = new Regex(@"C\..*");
                     Regex regexD = new Regex(@"D\..*");
+                    Regex regexE = new Regex(@"E\..*");
                     TextRange textRange = shape.TextFrame.TextRange;
                     int perOptionsCount = 0;
+                    bool hasEOption = false;
                     // 收集每一行的选项数量
                     for (int i = 1; i <= textRange.Lines().Count; i++)
                     {
@@ -537,6 +539,10 @@ namespace hexin_csharp
                             MatchCollection matchB = regexB.Matches(lineText);
                             MatchCollection matchC = regexC.Matches(lineText);
                             MatchCollection matchD = regexD.Matches(lineText);
+                            if (regexE.IsMatch(lineText))
+                            {
+                                hasEOption = true;
+                            }
                             if (choiceRegex.IsMatch(lineText)) // 先判断这是个选项 
                             {
                                 if(regexA.IsMatch(lineText))
@@ -571,6 +577,7 @@ namespace hexin_csharp
                         total += lineCount;
                     }
                     if (total == 4 && 
+                        !hasEOption &&
                         !optionCountsPerLine.Contains(4) && 
                         optionCountsPerLine.Any(count => count != optionCountsPerLine[0]))
                     {
