@@ -41,7 +41,7 @@ namespace hexin_csharp
         {
             // 详细阅读文档：https://sigmaai.feishu.cn/docs/doccncPV9QaIVlcDYRHs6nEpl8e#ZHEaGa
 
-            bool DEBUG = true;
+            bool DEBUG = false;
 
             string pptxPath, pptxSaveAsPath, pptxImageSavAsPath;
 
@@ -53,9 +53,9 @@ namespace hexin_csharp
             }
             else
             {
-                pptxPath = "C:\\Users\\17146\\Desktop\\pptx\\卓越-【应届生导学案】第20课时平面向量综合.docx064e0.pptx";
-                pptxSaveAsPath = "C:\\Users\\17146\\Desktop\\pptx\\1（1）.pptx";
-                pptxImageSavAsPath = "C:\\Users\\17146\\Desktop\\pptx\\vstopptximages";
+                pptxPath = "C:\\Users\\Administrator\\Downloads\\57630e7d9c6441eea6dd.pptx";
+                pptxSaveAsPath = "C:\\Users\\Administrator\\Downloads\\1（1）.pptx";
+                pptxImageSavAsPath = "C:\\hexin\\vstopptximages";
             }
 
             if (!File.Exists(pptxPath))
@@ -505,34 +505,33 @@ namespace hexin_csharp
                     Log("-3201#" + slide.SlideIndex + "#题干中间存在非题干的部分#P00");
                 }
             }
-        }
 
-        public static void TestShape(Shape shape, Shape containerShape)
-        {
-            Slide slide = containerShape.Parent;
-            List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
-            int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
-            List<int> optionCountsPerLine = new List<int>();
-            // 创建一个字号集合，用于存储不一致的字号
-            
-            Regex regex = new Regex(@"[A-Z]\.\w+");
-            
-            // 检查选项布局和标题异常
-            if (shape.HasTextFrame == MsoTriState.msoTrue )
+
+            float mostFrequentFontSize = 0;
+            int maxCount = 0;
+            Dictionary<float, int> fontSizeCountMap = new Dictionary<float, int>();
+            int charCount = 0;  // 总字符数量
+            foreach (var shape in shapes)
             {
-                    Dictionary<float, int> fontSizeCountMap = new Dictionary<float, int>();
+                try
+                {
                     TextRange textRange = shape.TextFrame.TextRange;
-                    int charCount = 0;
+
                     // 遍历每个字符
                     for (int i = 1; i <= textRange.Length; i++)
                     {
-                        TextRange charRange = textRange.Characters(i, 1); // 获取单个字符
-                        string charText = charRange.Text.Trim(); // 去除首尾空格
+                        TextRange charRange = textRange.Characters(i, 1);  // 获取单个字符
+                        string charText = charRange.Text.Trim();  // 去除首尾空格
                         float fontSize = charRange.Font.Size;
 
                         // 统计字号出现次数
-                        if (!string.IsNullOrWhiteSpace(charText))
+                        // 只匹配中英文, 忽略字号是 1 的特殊情况, 忽略控制字符.
+                        if (!string.IsNullOrWhiteSpace(charText) &&
+                            Math.Abs(fontSize - 1) < 0.0001f &&
+                            !char.IsControl(charText[0]) &&
+                            Regex.IsMatch(charText, @"^[a-zA-Z0-9\u4e00-\u9fa5\s\p{P}]$"))
                         {
+                            Log(charText + "---" + fontSize + "----" + shape.Name);
                             charCount++;
                             if (!fontSizeCountMap.ContainsKey(fontSize))
                             {
@@ -542,45 +541,39 @@ namespace hexin_csharp
                             {
                                 fontSizeCountMap[fontSize]++;
                             }
-                        }
-                       
-                    }
-
-                    // 找到字号不一致的文字
-                    foreach (var kvp in fontSizeCountMap)
-                    {
-                        if (kvp.Value < charCount && kvp.Value > 1)
-                        {
-                            Log("-3002#" + slide.SlideIndex + "#文档中存在异常字号#P00");
-                        }
-                    }
-
-                    
-                    int totalOptionsCount = 0;
-                    for (int i = 1; i <= textRange.Lines().Count; i++)
-                    {
-                        try
-                        {
-                            string lineText = textRange.Lines(i).Text;
-                            MatchCollection matches = regex.Matches(lineText);
-                            if(regex.IsMatch(lineText))
-                            { 
-                                // 收集每一行的选项数量
-                                totalOptionsCount += matches.Count;
-                                optionCountsPerLine.Add(matches.Count);
+                            // 更新数量最多的字号和对应的计数
+                            if (fontSizeCountMap[fontSize] > maxCount)
+                            {
+                                mostFrequentFontSize = fontSize;
+                                maxCount = fontSizeCountMap[fontSize];
                             }
                         }
-                        catch (ArgumentException)
-                        {
-                            // Log( "无法获取第" + slide.SlideIndex + "页: " + "第 " + i + " 段的文本");
-                        }
                     }
-                    // 只有是 QC 并且不是 AN AS
-                    if (totalOptionsCount == 4 && !optionCountsPerLine.Contains(4) && !optionCountsPerLine.All(count => count == optionCountsPerLine[0]) && shape.Name.StartsWith("QC") && !shape.Name.Contains("AN") && !shape.Name.Contains("AS") )
-                    {
-                        Log("-3401#" + slide.SlideIndex + "#选项布局异常#P00");
-                    }
+                }
+                catch (Exception e)
+                {
+                    // 
+                }
             }
+
+            // 找到字号不一致的文字
+            foreach (var kvp in fontSizeCountMap)
+            {
+                if (kvp.Value < charCount &&
+                    kvp.Value > 1 &&
+                    Math.Abs(kvp.Key - mostFrequentFontSize) >= 5)
+                {
+                    Log("-3002#" + slide.SlideIndex + "#文档中存在异常字号#P00");
+                }
+            }
+            
+        }
+
+        public static void TestShape(Shape shape, Shape containerShape)
+        {
+            Slide slide = containerShape.Parent;
+            List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
+            int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
             // @tips：
             // docx_html 环节的机器质检信息。
             // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
@@ -852,8 +845,7 @@ namespace hexin_csharp
                 }
                 if (Regex.IsMatch(line.Text, @"^[一二三四五六六七八九]、") ||
                     Regex.IsMatch(line.Text, @"第.*?卷") ||
-                    Regex.IsMatch(line.Text, @"第.*?部分") || 
-                    Regex.IsMatch(line.Text, @"考向"))
+                    Regex.IsMatch(line.Text, @"第.*?部分"))
                 {
                     iserror = true;
                 }
