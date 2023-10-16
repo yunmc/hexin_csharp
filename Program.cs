@@ -531,7 +531,6 @@ namespace hexin_csharp
                             !char.IsControl(charText[0]) &&
                             Regex.IsMatch(charText, @"^[a-zA-Z0-9\u4e00-\u9fa5\s\p{P}]$"))
                         {
-                            Log(charText + "---" + fontSize + "----" + shape.Name);
                             charCount++;
                             if (!fontSizeCountMap.ContainsKey(fontSize))
                             {
