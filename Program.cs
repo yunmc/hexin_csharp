@@ -200,6 +200,7 @@ namespace hexin_csharp
 
         // -3xxx：单页问题
         // -3001：内容存在溢出
+        // -3002：文档中存在异常字号
 
         // -31xx：分页问题
         // -3101：页面不能太空
@@ -220,7 +221,10 @@ namespace hexin_csharp
         // -3303：疑似标题识别异常
         // -3304：左括号不能单独在行末
         // -3305：标题不能在页末
-
+        
+        // -34xx：布局问题
+        // -3401: 选项布局异常
+        
         // -4xxx：docx_html 机器质检问题
 
         public static void Test()
@@ -501,6 +505,67 @@ namespace hexin_csharp
                     Log("-3201#" + slide.SlideIndex + "#题干中间存在非题干的部分#P00");
                 }
             }
+
+
+            float mostFrequentFontSize = 0;
+            int maxCount = 0;
+            Dictionary<float, int> fontSizeCountMap = new Dictionary<float, int>();
+            int charCount = 0;  // 总字符数量
+            foreach (var shape in shapes)
+            {
+                try
+                {
+                    TextRange textRange = shape.TextFrame.TextRange;
+
+                    // 遍历每个字符
+                    for (int i = 1; i <= textRange.Length; i++)
+                    {
+                        TextRange charRange = textRange.Characters(i, 1);  // 获取单个字符
+                        string charText = charRange.Text.Trim();  // 去除首尾空格
+                        float fontSize = charRange.Font.Size;
+
+                        // 统计字号出现次数
+                        // 只匹配中英文, 忽略字号是 1 的特殊情况, 忽略控制字符.
+                        if (!string.IsNullOrWhiteSpace(charText) &&
+                            Math.Abs(fontSize - 1) < 0.0001f &&
+                            !char.IsControl(charText[0]) &&
+                            Regex.IsMatch(charText, @"^[a-zA-Z0-9\u4e00-\u9fa5\s\p{P}]$"))
+                        {
+                            charCount++;
+                            if (!fontSizeCountMap.ContainsKey(fontSize))
+                            {
+                                fontSizeCountMap[fontSize] = 1;
+                            }
+                            else
+                            {
+                                fontSizeCountMap[fontSize]++;
+                            }
+                            // 更新数量最多的字号和对应的计数
+                            if (fontSizeCountMap[fontSize] > maxCount)
+                            {
+                                mostFrequentFontSize = fontSize;
+                                maxCount = fontSizeCountMap[fontSize];
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    // 
+                }
+            }
+
+            // 找到字号不一致的文字
+            foreach (var kvp in fontSizeCountMap)
+            {
+                if (kvp.Value < charCount &&
+                    kvp.Value > 1 &&
+                    Math.Abs(kvp.Key - mostFrequentFontSize) >= 5)
+                {
+                    Log("-3002#" + slide.SlideIndex + "#文档中存在异常字号#P00");
+                }
+            }
+            
         }
 
         public static void TestShape(Shape shape, Shape containerShape)
