@@ -3812,5 +3812,40 @@ namespace hexin_csharp
                 returnInfo.ErrorType.ToString()
             };
         }
+        
+        static public bool IsShapeOverflowing(Slide slide, Shape shape)
+        {
+             // 获取版心的边界
+             double viewLeft = GetViewLeft();
+             double viewTop = GetRealViewTop(slide);
+             double viewRight = GetViewRight();
+             double viewBottom = GetRealViewBottom(slide);
+            
+             // 获取shape的边界
+             double shapeLeft = shape.Left;
+             double shapeTop = shape.Top;
+             double shapeRight, shapeBottom;
+
+             // 如果shape是文本框，则获取文本内容的实际宽度和高度
+             if (shape.HasTextFrame == MsoTriState.msoTrue && shape.TextFrame.HasText == MsoTriState.msoTrue)
+             {
+                 TextRange textRange = shape.TextFrame.TextRange;
+                 shapeRight = shapeLeft + textRange.BoundWidth;
+                 shapeBottom = shapeTop + textRange.BoundHeight;
+             }
+             else
+             {
+                 shapeRight = shapeLeft + shape.Width;
+                 shapeBottom = shapeTop + shape.Height;
+             }
+             // 检查shape是否溢出版心
+             bool isOverflowingView = 
+                 (shapeLeft < viewLeft) ||
+                 (shapeTop < viewTop) ||
+                 (shapeRight > viewRight) ||
+                 (shapeBottom > viewBottom);
+            
+                return isOverflowingView;
+        }
     }
 }

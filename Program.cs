@@ -508,6 +508,12 @@ namespace hexin_csharp
             Slide slide = containerShape.Parent;
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
+
+            if (!Utils.IsShapeOverflowing(slide, shape))
+            {
+                Log( "-3001#" + slide.SlideIndex + "#内容存在溢出#P0");
+            }
+            
             // @tips：
             // docx_html 环节的机器质检信息。
             // 机器质检信息详细参考：https://gitee.com/lawrencekkk/word_to_fbd/blob/master/fbd_task/module_v3/data_collect.py
