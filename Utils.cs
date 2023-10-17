@@ -19,6 +19,15 @@ public struct VbaReturn
     public string ErrorType; // 区分 Err 是生成异常 -1、还是机器质检报错 -2
 }
 
+// 定义溢出类型的枚举
+public enum OverflowType
+{
+    None,           // 没有溢出
+    TextOverflow,   // 文本溢出
+    TableOverflow,  // 表格溢出
+    OtherOverflow   // 其他类型的Shape溢出
+}
+
 namespace hexin_csharp
 {
     public class Utils
@@ -611,6 +620,7 @@ namespace hexin_csharp
                     }
                 }
             }
+            Console.WriteLine(getViewRight);
             if (getViewRight > Global.slideWidth || getViewRight < Global.viewRight)
             {
                 getViewRight = Global.viewRight;
@@ -3813,7 +3823,7 @@ namespace hexin_csharp
             };
         }
         
-        static public bool IsShapeOverflowing(Slide slide, Shape shape)
+        static public OverflowType IsShapeOverflowing(Slide slide, Shape shape)
         {
              // 获取版心的边界
              double viewLeft = GetViewLeft();
@@ -3826,26 +3836,53 @@ namespace hexin_csharp
              double shapeTop = shape.Top;
              double shapeRight, shapeBottom;
 
-             // 如果shape是文本框，则获取文本内容的实际宽度和高度
+             // 如果shape是文本框，获取文本内容的实际宽度和高度
              if (shape.HasTextFrame == MsoTriState.msoTrue && shape.TextFrame.HasText == MsoTriState.msoTrue)
              {
                  TextRange textRange = shape.TextFrame.TextRange;
                  shapeRight = shapeLeft + textRange.BoundWidth;
                  shapeBottom = shapeTop + textRange.BoundHeight;
              }
+             // 如果shape是表格，获取表格的宽度和高度
+             else if (shape.HasTable == MsoTriState.msoTrue)
+             {
+                 shapeRight = shapeLeft + shape.Width;
+                 shapeBottom = shapeTop + shape.Height;
+             }
+             // 其他类型的shape，也获取它们的宽度和高度
              else
              {
                  shapeRight = shapeLeft + shape.Width;
                  shapeBottom = shapeTop + shape.Height;
              }
              // 检查shape是否溢出版心
-             bool isOverflowingView = 
+             bool isOverflowingView =
                  (shapeLeft < viewLeft) ||
                  (shapeTop < viewTop) ||
                  (shapeRight > viewRight) ||
                  (shapeBottom > viewBottom);
-            
-                return isOverflowingView;
+              Console.WriteLine(shapeLeft + " --- " + viewLeft + " || " + shapeTop + " --- " + viewTop + " || " + shapeRight + " --- " + viewRight + " || " +  shapeBottom + " --- " + viewBottom + " || "  );
+            // Console.WriteLine("left:" + (shapeLeft < viewLeft ? "true" : "false") + " top:" + (shapeTop < viewTop ? "true" : "false") + " right:" + (shapeRight > viewRight ? "true" : "false") + " bottom:" + (shapeBottom > viewBottom ? "true" : "false") );
+             // 根据shape类型和溢出状态返回溢出类型
+             if (isOverflowingView)
+             {
+                 if (shape.HasTable == MsoTriState.msoTrue)
+                 {
+                     return OverflowType.TableOverflow;
+                 }
+                 else if (shape.HasTextFrame == MsoTriState.msoTrue && shape.TextFrame.HasText == MsoTriState.msoTrue)
+                 {
+                     return OverflowType.TextOverflow;
+                 }
+                 else
+                 {
+                     return OverflowType.OtherOverflow;
+                 }
+             }
+             else
+             {
+                 return OverflowType.None;
+             }
         }
     }
 }

@@ -200,6 +200,8 @@ namespace hexin_csharp
 
         // -3xxx：单页问题
         // -3001：内容存在溢出
+        // -3002：内容溢出动态版心
+        // -3003：文档中存在超长的表格
 
         // -31xx：分页问题
         // -3101：页面不能太空
@@ -509,9 +511,25 @@ namespace hexin_csharp
             List<Shape> shapes = Utils.GetSortedStaticSlideShapes(slide);
             int shapeIndex = Utils.FindShapeIndex(containerShape, shapes);
 
-            if (!Utils.IsShapeOverflowing(slide, shape))
+            // 判断是否溢出版心和溢出类型
+            OverflowType overflowType = Utils.IsShapeOverflowing(slide, shape);
+            // 根据返回的OverflowType值来处理不同的溢出情况
+            switch (overflowType)
             {
-                Log( "-3001#" + slide.SlideIndex + "#内容存在溢出#P0");
+                case OverflowType.None:
+                    break;
+                case OverflowType.TextOverflow:
+                    Log( "-3002#" + slide.SlideIndex + "#内容溢出动态版心#P1");
+                    break;
+                case OverflowType.TableOverflow:
+                    Log( "-3003#" + slide.SlideIndex + "#文档中存在超长的表格#P00");
+                    break;
+                case OverflowType.OtherOverflow:
+                    Log( "-3002#" + slide.SlideIndex + "#内容溢出动态版心#P1");
+                    break;
+                default:
+                    Log( "-3002#" + slide.SlideIndex + "#内容溢出动态版心#P1");
+                    break;
             }
             
             // @tips：
